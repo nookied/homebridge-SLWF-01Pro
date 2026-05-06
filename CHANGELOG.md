@@ -7,6 +7,20 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [0.5.1] — 2026-05-06
+
+### Fixed
+
+- **User-chosen device names in Apple Home now persist across Homebridge restarts.** Previously, `setConfiguredName` ran for every service on every accessory build (cache-loaded or fresh), so renaming "Living Room AC" → "Bedroom AC" in Apple Home reverted to the config name on the next restart. Now `ConfiguredName` is only seeded for newly-created accessories; cached ones keep whatever value HAP/Apple Home has stored. Room assignment was already persistent — that's stored entirely on Apple Home's side, keyed by accessory UUID.
+- **Auto-discovered devices that are temporarily offline at restart no longer get unregistered.** Previously, `pruneOrphanedAccessories` removed any cached accessory whose host wasn't in the live list (manual devices + current discovery). With `autoDiscover` on, an offline device would disappear from Apple Home along with the user's name/room/automations. Now: with `autoDiscover` on, cached accessories are kept regardless — Apple Home shows them as "Not Responding" until they reconnect, preserving identity. To remove an accessory permanently, use the Homebridge UI → Remove Single Cached Accessory action. With `autoDiscover` off, the legacy prune behaviour is preserved (accessories not in `devices[]` are unregistered, since manual config is then the source of truth).
+
+### Internal
+
+- New `test/unit/pruning.test.js` covers both prune branches; new ConfiguredName regression test in `hapCompliance.test.js`. 144 tests total.
+- `pruneOrphanedAccessories` is now exported from `lib/esphome.js` for direct unit testing.
+
+---
+
 ## [0.5.0] — 2026-05-06
 
 ### Changed (default UX — affects fresh installs and any config that doesn't set the relevant flag explicitly)

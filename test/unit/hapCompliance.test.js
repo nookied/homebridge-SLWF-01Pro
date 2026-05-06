@@ -462,6 +462,38 @@ describe('HAP-compliance: RotationSpeed minStep follows fan-mode count', () => {
 	});
 });
 
+describe('ConfiguredName persistence across restarts', () => {
+	test('user rename in Apple Home is not clobbered when accessory loads from cache', () => {
+		const platform = makeFakePlatform();
+		platform.api.registerPlatformAccessories = () => {};
+
+		// First boot: fresh accessory, plugin seeds ConfiguredName from config name
+		new DeviceAccessory({
+			device: { name: 'Original Name', host: '192.168.1.10' },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			entities: { climate: makeFakeClimateEntity() },
+			platform,
+		});
+		const acc = platform.accessories[0];
+		const heaterCooler = acc.getService(Service.HeaterCooler);
+		expect(heaterCooler.getCharacteristic(Characteristic.ConfiguredName).value).toBe('Original Name');
+
+		// Simulate the user renaming via Apple Home (Apple Home writes ConfiguredName)
+		heaterCooler.getCharacteristic(Characteristic.ConfiguredName).updateValue('User Chosen Name');
+
+		// Second boot (Homebridge restart): same UUID → cached accessory reused.
+		// The plugin must NOT overwrite the user-chosen ConfiguredName.
+		new DeviceAccessory({
+			device: { name: 'Original Name', host: '192.168.1.10' },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			entities: { climate: makeFakeClimateEntity() },
+			platform,
+		});
+		const heaterCooler2 = platform.accessories[0].getService(Service.HeaterCooler);
+		expect(heaterCooler2.getCharacteristic(Characteristic.ConfiguredName).value).toBe('User Chosen Name');
+	});
+});
+
 describe('Per-device disable flags override platform defaults bidirectionally', () => {
 	function buildAccessory({ platformOverrides = {}, deviceOverrides = {} } = {}) {
 		const platform = makeFakePlatform();
