@@ -110,6 +110,18 @@ describe('chooseInitialTargetMode', () => {
 	test('HEAT_COOL passthrough', () => expect(chooseInitialTargetMode(ESP_MODE.HEAT_COOL)).toBe(ESP_MODE.HEAT_COOL));
 	test('OFF → COOL fallback', () => expect(chooseInitialTargetMode(ESP_MODE.OFF)).toBe(ESP_MODE.COOL));
 	test('DRY → COOL fallback', () => expect(chooseInitialTargetMode(ESP_MODE.DRY)).toBe(ESP_MODE.COOL));
+	test('OFF on heat-only device → HEAT fallback', () => {
+		expect(chooseInitialTargetMode(ESP_MODE.OFF, [ESP_MODE.OFF, ESP_MODE.HEAT])).toBe(ESP_MODE.HEAT);
+	});
+	test('stale COOL context on heat-only device → HEAT fallback', () => {
+		expect(chooseInitialTargetMode(ESP_MODE.COOL, [ESP_MODE.OFF, ESP_MODE.HEAT])).toBe(ESP_MODE.HEAT);
+	});
+	test('OFF on auto-only device → AUTO fallback', () => {
+		expect(chooseInitialTargetMode(ESP_MODE.OFF, [ESP_MODE.OFF, ESP_MODE.AUTO])).toBe(ESP_MODE.AUTO);
+	});
+	test('OFF on HEAT_COOL-only device → HEAT_COOL fallback', () => {
+		expect(chooseInitialTargetMode(ESP_MODE.OFF, [ESP_MODE.OFF, ESP_MODE.HEAT_COOL])).toBe(ESP_MODE.HEAT_COOL);
+	});
 });
 
 describe('pickAutoMode', () => {

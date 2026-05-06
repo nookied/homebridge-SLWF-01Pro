@@ -1,6 +1,6 @@
 # QA — Manual pre-release checklist
 
-Run this on the real Homebridge host before tagging a release. Jest covers the pure helpers and HAP shape (144 unit tests as of 0.5.1); this checklist is the line of defence against regressions on real ESPHome hardware that the unit suite can't see.
+Run this on the real Homebridge host before tagging a release. Jest covers the pure helpers and HAP shape (159 unit tests as of the local post-0.5.2 review); this checklist is the line of defence against regressions on real ESPHome hardware that the unit suite can't see.
 
 Budget: ~10 minutes per release.
 
@@ -13,7 +13,7 @@ Budget: ~10 minutes per release.
 - [ ] `CHANGELOG.md` has an entry for the new version with date
 - [ ] `package.json` `repository.url` matches the GitHub repo URL exactly (sigstore provenance is strict — see CHANGELOG)
 - [ ] `npm run lint` clean
-- [ ] `npm test` — all unit tests pass (144 as of 0.5.1; bump this number alongside any test additions)
+- [ ] `npm test` — all unit tests pass (159 as of the local post-0.5.2 review; bump this number alongside any test additions)
 - [ ] `node -e "require('./index.js')"` smoke test exits 0
 - [ ] Working git SHA noted for rollback: `_______________`
 
@@ -78,7 +78,7 @@ Open the iOS Home app:
 
 ## 4c. Multi-entity services
 
-For each AC accessory in HomeKit, verify the optional services match the device's ESPHome dashboard:
+Set the optional service flags you want to test to `false` first; since 0.5.0 they default to hidden. For each AC accessory in HomeKit, verify the optional services match the device's ESPHome dashboard:
 
 - [ ] Tap on the AC tile → ⓘ → all expected services are listed (HumiditySensor / Outdoor Temperature / Beeper / Display / Dry / Fan Only).
 - [ ] **Humidity** matches the ESPHome dashboard's "Indoor Humidity" reading (or set `disableHumiditySensor: true` if the AC has no humidity probe and the value reads `0%`).
@@ -89,7 +89,8 @@ For each AC accessory in HomeKit, verify the optional services match the device'
 - [ ] **Fan Only Switch** — same pattern as Dry, but with FAN_ONLY mode.
 - [ ] **Power Usage** appears in Eve.app (third-party HomeKit app required) — main AC tile in Eve shows current W and a history graph that fills over time.
 - [ ] **Per-device disable flag** — set `disableHumiditySensor: true` on one device's `devices[]` entry and `false` on another; only the second device shows the humidity service.
-- [ ] **Global disable flag** — set `disableBeeperSwitch: true` at platform level; no device shows a Beeper switch even if the entity exists.
+- [ ] **Global disable flag** — set `disableBeeperSwitch: true` at platform level; no device shows a Beeper switch unless that device explicitly sets `disableBeeperSwitch: false`.
+- [ ] **Hostless manual entry safety** — add a named manual device without `host`, restart with `autoDiscover: false`; Homebridge logs a warning and keeps cached accessories instead of pruning them.
 - [ ] **Removed-service cleanup** — toggle a service's disable flag from `false` → `true`, restart Homebridge, the previously-shown service tile disappears (cached cleanup).
 
 ## 4d. HEAT_COOL devices (skip if your device only supports AUTO=6)
@@ -108,6 +109,7 @@ These are bugs that broke previous versions. Verify they stay fixed:
 - [ ] **Disconnected device returns clean HomeKit error**, no `ReferenceError: log is not defined` *(broken in upstream 0.0.4)*. Reproduce: physically unplug the SLWF-01Pro / kill power to the AC for 30 seconds, then attempt to change a setting in HomeKit. Tile should show "Not Responding" cleanly; Homebridge log should have a single `ERROR setting status of <name>, device is disconnected` line, no stack trace.
 - [ ] **Cached accessory persists across restarts** *(broken before dynamic-platform fix)*. Restart Homebridge: previously-paired AC tiles should NOT need re-pairing.
 - [ ] **`lastTargetState` survives restart** *(only works with dynamic platform)*. Set AC to Heat, restart Homebridge, tap Off then On — should resume in Heat, not the default Cool.
+- [ ] **Heat-only restore mode stays supported** — on a heat-only device, tap Off then On; the plugin must restore Heat, not send unsupported Cool.
 - [ ] **HEAT_COOL devices show AUTO button** *(broken in upstream 0.0.4 — only AUTO=6 was handled)*. If your device's mode dropdown shows `HEAT_COOL` (not `AUTO`), the HomeKit AUTO button must still appear and work.
 - [ ] **StatusFault flips on disconnect** — pull the dongle's power for 30 sec; the AC tile in HomeKit shows a red badge / "Not Responding" while disconnected; reverts to normal on reconnect.
 - [ ] **Construction succeeds for devices without `unique_id` set in YAML** *(broken in 0.1.0/0.1.1; fixed in 0.1.2)*. Reproduce: an ESPHome device whose `climate:` block doesn't set `unique_id` should still get a stable HomeKit accessory; the log should show `Initialized "<name>" with N mapped entit(y|ies)` not `Failed to initialize ...: Received undefined`.

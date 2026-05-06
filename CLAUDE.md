@@ -13,10 +13,10 @@ This file is the canonical persistent memory for this project. Any assistant/age
 **Repo:** [`https://github.com/nookied/homebridge-SLWF-01Pro`](https://github.com/nookied/homebridge-SLWF-01Pro) — **maintained fork**
 **Original (upstream):** [`nitaybz/homebridge-esphome-ac`](https://github.com/nitaybz/homebridge-esphome-ac) — last release 0.0.4. The `upstream` git remote was deliberately removed in v0.2.0; the fork is fully independent.
 **License:** MIT (preserved from original)
-**Current version:** **0.5.1** — published on npm with provenance. 144 unit tests passing across 7 suites. CI on Node 18.20.4 / 20.15.1 / 22.x / 24.x. Tag-driven release pipeline. `ACCESSORY_SCHEMA_VERSION = 5`.
+**Current package version:** **0.5.2**. Latest published release state in this repo: 149 unit tests across 8 suites. Local unreleased review work after 0.5.2 adds restore-mode, ConfiguredName, hostless-device, current-temperature, and linked-service regressions; 159 unit tests pass locally. CI targets Node 18.20.4 / 20.15.1 / 22.x / 24.x. Tag-driven release pipeline. `ACCESSORY_SCHEMA_VERSION = 5`.
 **Engines:** Homebridge `^1.8.0 || ^2.0.0`; Node `^18.20.4 || ^20.15.1 || ^22.0.0 || ^24.0.0`
 
-> **Pairing status (resolved enough to use):** The child-bridge pairing issue from the 0.4.x audit (see [HANDOFF.md](HANDOFF.md) for original brief) was addressed across 0.4.4 → 0.5.1. The user successfully paired and sees devices. The fix bundle: Eve power moved off the `HeaterCooler` service onto a linked, hidden `Service.Outlet` (0.4.4); companion services hidden by default to keep visible service count down (0.5.0); ConfiguredName preserved across restarts so Apple Home renames stick (0.5.1); auto-discovered offline devices no longer pruned so Apple Home identity survives reboots (0.5.1). Per-device disable flags now override platform defaults *bidirectionally* (0.5.0).
+> **Pairing status (resolved enough to use):** The child-bridge pairing issue from the 0.4.x audit (see [HANDOFF.md](HANDOFF.md) for original brief) was addressed across 0.4.4 → 0.5.1. The user successfully paired and sees devices. The fix bundle: Eve power moved off the `HeaterCooler` service onto a linked, hidden `Service.Outlet` (0.4.4); companion services hidden by default to keep visible service count down (0.5.0); ConfiguredName preserved across restarts so Apple Home renames stick (0.5.1); auto-discovered offline devices no longer pruned so Apple Home identity survives reboots (0.5.1). 0.5.2 then removed empty Homebridge UI row log noise. Per-device disable flags now override platform defaults *bidirectionally* (0.5.0).
 
 ### What "SLWF-01Pro" is
 
@@ -128,16 +128,18 @@ homebridge-SLWF-01Pro/
 │
 ├── test/
 │   └── unit/
-│       ├── state.test.js                 Truth tables for all mappers + capability checks + deriveDeviceId (61 tests)
+│       ├── state.test.js                 Truth tables for all mappers + capability checks + deriveDeviceId (65 tests)
 │       ├── classifyEntity.test.js        Entity classification + bundling (17 tests)
 │       ├── discovery.test.js             prettyNameFromHostname + dedupeDevices (9 tests)
 │       ├── configSchema.test.js          Structural schema audit + drift checks vs. lib/constants.js (15 tests)
 │       ├── configSchemaValidation.test.js  ajv-based config-schema validation (20 tests)
 │       ├── hapCompliance.test.js         Mock HAP shim: AccessoryCategory, setPrimaryService, addLinkedService,
 │       │                                   ConfiguredName seeding + persistence, Identify handler, NaN-safe setProps,
-│       │                                   Eve power on hidden Outlet, RotationSpeed.minStep, schema-version
-│       │                                   single-sourcing, bidirectional per-device override (18 tests)
-│       └── pruning.test.js               pruneOrphanedAccessories: skip when autoDiscover on, prune when off (4 tests)
+│       │                                   Eve power on hidden Outlet, current-temperature clamp,
+│       │                                   capability-aware initial mode, RotationSpeed.minStep, schema-version
+│       │                                   single-sourcing, bidirectional per-device override
+│       ├── pruning.test.js               pruneOrphanedAccessories: skip when autoDiscover on, prune when off (4 tests)
+│       └── looksLikeRealEntry.test.js    Empty UI-row filtering + invalid manual config prune guard (10 tests)
 │
 ├── .github/workflows/
 │   ├── ci.yml                            Lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x, every push + PR
@@ -309,7 +311,7 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 4. **Encrypted ESPHome devices skip auto-discovery.** mDNS doesn't broadcast the Noise encryption key, so encrypted devices need a manual `devices[]` entry. Documented in README.
 5. **Heuristic entity classification.** Beeper/humidity/etc. are matched by name pattern. If a user customizes their ESPHome YAML to use unusual entity names, the entity won't be classified. Could add explicit `entityMap` config option later.
 
-### Resolved across 0.1.0 → 0.5.1
+### Resolved across 0.1.0 → 0.5.2 + local unreleased review
 - **Module-level `sendTimeout` shared across devices.** Multi-AC users could lose commands when changing one AC then another within 600 ms. Now a per-device `that._sendTimeout`.
 - **Undefined `log` ReferenceError on disconnect.** `stateManager.js` referenced bare `log` in the device-disconnected error path; would crash the call instead of returning a clean HAP error. Fixed to `that.log.error` and rejection now uses `HapStatusError`.
 - **Stacked `connected`/`disconnected` listeners.** Original code attached them inside the `entity.once('state')` callback — every Climate entity (and every reconnect) added another pair. Moved to platform scope, attached once per Client.
@@ -329,6 +331,11 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 - **Default-config UX overhaul** *(0.5.0)*. `autoDiscover` defaults to `true` and every `disable*` flag defaults to `true`, so a fresh install gives a clean Apple Home with just one HeaterCooler tile per AC. `index.js` switched from `||` to `??` so explicit `false` is honoured. Per-device override semantics now symmetric: `device[key] !== undefined ? Boolean(device[key]) : Boolean(platform[key])` — required so users can keep the global hide and selectively enable a service for a single AC.
 - **Apple Home rename clobbered on every restart** *(0.5.1)*. `setConfiguredName` now early-returns when `!this.isNewAccessory`, so a cached accessory keeps whatever HAP/Apple Home has stored. Room assignment was always safe (Apple Home stores it server-side, keyed by stable accessory UUID).
 - **Auto-discovered offline devices were unregistered on restart** *(0.5.1)*. `pruneOrphanedAccessories` now early-returns when `platform.autoDiscover` is on. An offline AC stays in the cache as "Not Responding" instead of being dropped (which would have lost the user's name/room/automations). With `autoDiscover` off, manual `devices[]` is the source of truth and the legacy prune behaviour is preserved (devices removed from config are unregistered).
+- **Empty Homebridge UI rows logged noisy warnings** *(0.5.2)*. `looksLikeRealEntry(device)` filters form scaffolding rows before client orchestration while still warning for real hostless entries.
+- **Heat-only devices could restore unsupported COOL on Active=ON** *(unreleased)*. `chooseInitialTargetMode(stateMode, supportedModesList)` now respects advertised capabilities, and `stateManager.set.Active` uses it for cached restore modes too. Stale or external unsupported HEAT/COOL target writes are ignored.
+- **New companion services on cached accessories could miss `ConfiguredName`** *(unreleased)*. `setConfiguredName` now preserves non-empty cached values but seeds the characteristic when the service is newly created after a config toggle.
+- **Invalid hostless manual entries could allow destructive pruning** *(unreleased)*. Real hostless manual entries now keep cached accessories until fixed instead of letting `autoDiscover: false` prune with an incomplete config. Empty UI scaffolding remains silently dropped.
+- **Main `CurrentTemperature` was not clamped on state updates** *(unreleased)*. Values are now constrained to the HAP-safe `-100..100` range before updating the primary HeaterCooler service.
 
 ### By design (won't fix)
 - **No upstream PR-back.** The fork is intentionally divergent and the upstream's release cadence (last release ~2 years ago) doesn't justify the round-trip.
@@ -385,7 +392,7 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 | `CHANGELOG.md` | Release history (Keep a Changelog) |
 | `ROADMAP.md` | Development plan (M1–M5) |
 | `HANDOFF.md` | Active-issue brief for the next coding instance (open pairing problem) |
-| `test/unit/*.test.js` | Jest unit tests (144 currently across 7 suites) |
+| `test/unit/*.test.js` | Jest unit tests (159 currently across 8 suites) |
 | `QA_TESTS.md` | Manual pre-release checklist |
 | `AGENTS.md` | Pointer to this file |
 | `CLAUDE.md` | This file — project memory |

@@ -8,19 +8,19 @@ The fork was taken at upstream 0.0.4 because the upstream's release cadence (las
 
 ## TL;DR — where we're aiming
 
-1. **Stable 0.5.x baseline.** The 0.4.x pairing concerns are resolved (user-confirmed paired); 0.5.x flipped defaults so a fresh install gives a clean Apple Home and per-device overrides became symmetric. Restart-resilience for Apple Home renames + offline auto-discovered devices landed in 0.5.1.
+1. **Stable 0.5.x baseline.** The 0.4.x pairing concerns are resolved (user-confirmed paired); 0.5.x flipped defaults so a fresh install gives a clean Apple Home and per-device overrides became symmetric. Restart-resilience for Apple Home renames + offline auto-discovered devices landed in 0.5.1; empty Homebridge UI row filtering landed in 0.5.2.
 2. **Apply for Homebridge Verified** once 0.5.x has a few stable weeks in the wild. All requirements are already met (dynamic platform ✓, config.schema ✓, no telemetry ✓, errors caught ✓, tests ✓, tag-driven release ✓, npm name correct ✓).
 3. **Feature coverage** — custom fan modes (`silent`/`turbo`), presets (`eco`/`boost`/`sleep`/`away`), two-point target temperature. See M4/M5 below.
 
 ---
 
-## Where we are today (0.5.1 published)
+## Where we are today (0.5.2 package, local review in progress)
 
-✅ **Shipped on npm as `homebridge-slwf-01pro@0.5.1` with provenance.** Tag-driven release pipeline via GitHub Actions. CI runs lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x. **144 unit tests passing** across 7 suites (state, classifyEntity, discovery, configSchema, configSchemaValidation, hapCompliance, pruning).
+✅ **Package version is `homebridge-slwf-01pro@0.5.2`.** Tag-driven release pipeline via GitHub Actions. CI runs lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x. **159 unit tests pass locally** across 8 suites (state, classifyEntity, discovery, configSchema, configSchemaValidation, hapCompliance, pruning, looksLikeRealEntry).
 
 ✅ Dynamic platform, per-device debouncing, mode-mapping refactor with HEAT_COOL handling. **mDNS auto-discovery on by default** (since 0.5.0). **Multi-entity bundling** (Climate + sensors + switches + buttons → one HomeKit accessory) with `HumiditySensor`, outdoor `TemperatureSensor`, hidden-Outlet Eve.Energy power, Beeper switch, Display switch, DRY/FAN_ONLY mode tiles, all hidden by default with bidirectional per-device override. `StatusActive`/`StatusFault` mirror connection state.
 
-✅ **HAP best practices** through 0.5.1: `Categories.AIR_CONDITIONER`, `setPrimaryService(true)`, `addLinkedService` for companion services, `ConfiguredName` seeded on first registration only (Apple-Home renames persist across restarts), no-op `Identify` handler, `setProps` NaN-safety, `RotationSpeed.minStep` sized to fan-mode count, mode-fallthrough uses `validValues[0]`, `FirmwareRevision` SemVer-sanitized, Eve `CurrentPowerConsumption` on a hidden linked Outlet (not on the standard `HeaterCooler` service), `ACCESSORY_SCHEMA_VERSION = 5` evicts older cached accessories on upgrade.
+✅ **HAP best practices** through local review: `Categories.AIR_CONDITIONER`, `setPrimaryService(true)`, `addLinkedService` for companion services, `ConfiguredName` seeded on first registration and for newly-added cached companion services (Apple-Home renames persist across restarts), no-op `Identify` handler, `setProps` NaN-safety, primary `CurrentTemperature` clamped to HAP-safe range, `RotationSpeed.minStep` sized to fan-mode count, mode-fallthrough uses `validValues[0]`, capability-aware Active restore mode, `FirmwareRevision` SemVer-sanitized, Eve `CurrentPowerConsumption` on a hidden linked Outlet (not on the standard `HeaterCooler` service), `ACCESSORY_SCHEMA_VERSION = 5` evicts older cached accessories on upgrade.
 
 ✅ **Restart-resilience** since 0.5.1: Apple Home renames stick across Homebridge restarts; auto-discovered devices that are offline at restart keep their HomeKit identity (name/room/automations) instead of being unregistered.
 
@@ -50,7 +50,7 @@ Source: [`homebridge/verified`](https://github.com/homebridge/verified). 11 requ
 | 10 | Files stored under HB storage dir | ✅ | No disk files |
 | 11 | Catches and logs own errors, no unhandled exceptions | ✅ | Fork pass added `HapStatusError` rejections + try/catch around `climateCommandService` |
 
-**All 11 requirements met as of 0.4.3.** Verification application is queued behind the active pairing issue (see HANDOFF.md). Once that's resolved and the plugin has been stable in real-world use for ~2 weeks with at least one external user, file via the `homebridge/verified` issue template.
+**All 11 requirements met.** Verification application is queued behind a stable 0.5.x soak period with at least one external user; the earlier pairing issue is resolved enough for daily use. File via the `homebridge/verified` issue template once the soak period is satisfactory.
 
 ---
 
@@ -73,7 +73,7 @@ Versioning policy below is pre-1.0; once stable, switch to strict [SemVer](https
 | **Multi-entity bundling** | Climate + sensors + switches + buttons → single accessory | ✅ Done |
 | **Humidity sensor** | `Service.HumiditySensor` + `disableHumiditySensor` flag | ✅ Done |
 | **Outdoor temperature sensor** | `Service.TemperatureSensor` + `disableOutdoorTempSensor` flag | ✅ Done |
-| **Power consumption** | Eve.Energy custom characteristic + fakegato-history + `disablePowerSensor` flag | ✅ Done |
+| **Power consumption** | Eve.Energy power monitoring + fakegato-history + `disablePowerSensor` flag (moved to hidden linked Outlet in 0.4.4) | ✅ Done |
 | **Beeper switch** | `Service.Switch` + `disableBeeperSwitch` flag | ✅ Done |
 | **Display Toggle switch** | `Service.Switch` (stateless) + `disableDisplaySwitch` flag | ✅ Done |
 | **DRY mode switch** | `Service.Switch` + `disableDryMode` flag | ✅ Done |
@@ -113,21 +113,23 @@ Versioning policy below is pre-1.0; once stable, switch to strict [SemVer](https
 
 ---
 
-### 🔴 Milestone 3 — v0.5.0 — Resolve the active pairing issue
+### ✅ Milestone 3 — v0.5.x — Resolve the active pairing issue — SHIPPED
 
-**Goal:** unblock real-world use. The plugin code is HAP-best-practice clean as far as our audit could see, yet pairing the bridge in Apple Home intermittently fails (see [HANDOFF.md](HANDOFF.md)).
+**Goal:** unblock real-world use. Pairing now succeeds in the user's Apple Home setup.
 
-**Untested hypotheses, in order of leverage:**
+**What shipped:**
 
-| Item | Description | Effort |
+| Item | Description | Status |
 |---|---|---|
-| **Bare-bones config test** | User-side: set every `disable*` flag to `true` and try to pair. Confirms whether the issue is service count vs. plugin-shape. | 5 min user time |
-| **Eve.Energy on dedicated `Service.Outlet`** | Move `CurrentPowerConsumption` off the standard `HeaterCooler` service. Requires `addLinkedService` + a new subtype. | 2 h |
-| **Default companion services to disabled** | Switch from opt-out to opt-in for `disableBeeperSwitch` / `disableDisplaySwitch` / `disableDryMode` / `disableFanOnlyMode` so a fresh install pairs cleanly with minimal services, then user enables what they want. Breaking config-shape change → bumps minor. | 1 h |
-| **Bridge HAP state reset documentation** | Surface the `AccessoryInfo.<bridgeId>.json` + `IdentifierCache.<bridgeId>.json` reset path in the troubleshooting section of README. | 30 min |
-| **`clientInfo` to ESPHome** | Pass `clientInfo: 'homebridge-slwf-01pro/<version>'` so device-side logs identify the plugin. | 15 min |
+| **Eve.Energy on dedicated hidden `Service.Outlet`** | Moved `CurrentPowerConsumption` off the standard `HeaterCooler` service and linked the hidden Outlet to the primary AC service. | ✅ 0.4.4 |
+| **Default companion services to disabled** | Fresh installs now show just the HeaterCooler tile; users opt extras back in with `disable*: false`. | ✅ 0.5.0 |
+| **Bidirectional per-device overrides** | A single AC can opt into a service while the platform default remains hidden. | ✅ 0.5.0 |
+| **ConfiguredName persistence** | Apple Home renames are not clobbered on restart. | ✅ 0.5.1 |
+| **Auto-discovered offline devices kept** | mDNS misses no longer remove cached accessories when `autoDiscover` is on. | ✅ 0.5.1 |
+| **Empty UI row filtering** | Homebridge UI form scaffolding rows no longer log noisy host warnings. | ✅ 0.5.2 |
+| **Invalid manual config prune guard** | Local review keeps cached accessories when a real manual entry is missing `host`. | ✅ unreleased |
 
-**Total estimate:** 4 hours of code + iterations on user feedback. Ships as `0.5.0` (or `0.4.4` if no breaking config change is needed).
+**Historical diagnostics:** [HANDOFF.md](HANDOFF.md) remains as the archived pairing diagnostic flow.
 
 ---
 

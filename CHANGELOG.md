@@ -7,6 +7,23 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **Heat-only / auto-only devices no longer restore an unsupported COOL mode when turned back on.** `chooseInitialTargetMode` now considers `supportedModesList`, and `Active` uses that helper for cached restore modes too.
+- **External or stale HomeKit writes for unsupported HEAT/COOL target states are ignored** instead of sending unsupported ESPHome modes.
+- **Newly-enabled companion services on cached accessories now get `ConfiguredName` seeded.** Existing Apple Home renames are still preserved, but services that did not exist in the cache yet no longer start with a blank ConfiguredName.
+- **Hostless manual device entries are non-destructive.** Empty Homebridge UI form scaffolding is dropped before orchestration, and real but invalid manual entries now keep cached accessories instead of allowing orphan pruning while the config is incomplete.
+- **Main current-temperature updates are clamped to the HAP-safe range** before writing to `CurrentTemperature`.
+- **Linked services are not re-linked redundantly** when the service is already present in HAP-NodeJS's `linkedServices` list.
+
+### Internal
+
+- Added regression coverage for capability-aware restore modes, cached-service `ConfiguredName` seeding, current-temperature clamping, manual-device filtering, and invalid-config prune protection. 159 tests total.
+
+---
+
 ## [0.5.2] — 2026-05-06
 
 ### Fixed

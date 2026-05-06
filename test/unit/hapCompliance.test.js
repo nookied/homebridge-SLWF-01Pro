@@ -196,7 +196,7 @@ function makeFakePlatform() {
 // Stub the fakegato-history require since we don't want to test that path
 jest.mock('fakegato-history', () => null, { virtual: true });
 
-function makeFakeClimateEntity({ supportedModes = [0, 2, 3, 6], supportedFanModes = [2, 3, 4, 5], supportedSwingModes = [0, 1] } = {}) {
+function makeFakeClimateEntity({ supportedModes = [0, 2, 3, 6], supportedFanModes = [2, 3, 4, 5], supportedSwingModes = [0, 1], state = {} } = {}) {
 	const handlers = {};
 	return {
 		type: 'Climate',
@@ -218,6 +218,7 @@ function makeFakeClimateEntity({ supportedModes = [0, 2, 3, 6], supportedFanMode
 			targetTemperature: 21,
 			fanMode: 4,              // MEDIUM
 			swingMode: 0,
+			...state,
 		},
 		on(event, fn) { handlers[event] = fn; },
 		once(event, fn) { handlers[event] = fn; },
@@ -422,6 +423,21 @@ describe('HAP-compliance: visual temp props sanitization', () => {
 		expect(Number.isFinite(cooling.props.maxValue)).toBe(true);
 		expect(Number.isFinite(cooling.props.minStep)).toBe(true);
 	});
+
+	test('clamps out-of-range current temperature before writing to HAP', () => {
+		const platform = makeFakePlatform();
+		platform.api.registerPlatformAccessories = () => {};
+		const climate = makeFakeClimateEntity({ state: { currentTemperature: 150 } });
+		new DeviceAccessory({
+			device: { name: 'AC', host: '192.168.1.10' },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			entities: { climate },
+			platform,
+		});
+		const acc = platform.accessories[0];
+		const heaterCooler = acc.getService(Service.HeaterCooler);
+		expect(heaterCooler.getCharacteristic(Characteristic.CurrentTemperature).value).toBe(100);
+	});
 });
 
 describe('HAP-compliance: schema version constant is single-sourced', () => {
@@ -491,6 +507,45 @@ describe('ConfiguredName persistence across restarts', () => {
 		});
 		const heaterCooler2 = platform.accessories[0].getService(Service.HeaterCooler);
 		expect(heaterCooler2.getCharacteristic(Characteristic.ConfiguredName).value).toBe('User Chosen Name');
+	});
+
+	test('newly-enabled companion service on cached accessory still gets ConfiguredName seeded', () => {
+		const platform = makeFakePlatform();
+		platform.api.registerPlatformAccessories = () => {};
+
+		new DeviceAccessory({
+			device: { name: 'Original Name', host: '192.168.1.10', disableBeeperSwitch: true },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			entities: { climate: makeFakeClimateEntity() },
+			platform,
+		});
+		expect(platform.accessories[0].getServiceById(Service.Switch, 'beeper')).toBeUndefined();
+
+		const beeperSwitch = { type: 'Switch', name: 'Beeper', config: { name: 'Beeper', objectId: 'beeper' }, state: { state: false }, on: () => {}, setState: () => {} };
+		new DeviceAccessory({
+			device: { name: 'Original Name', host: '192.168.1.10', disableBeeperSwitch: false },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			entities: { climate: makeFakeClimateEntity(), beeperSwitch },
+			platform,
+		});
+
+		const beeper = platform.accessories[0].getServiceById(Service.Switch, 'beeper');
+		expect(beeper).toBeDefined();
+		expect(beeper.getCharacteristic(Characteristic.ConfiguredName).value).toBe('Original Name Beeper');
+	});
+});
+
+describe('Initial target mode follows advertised capabilities', () => {
+	test('heat-only device does not cache COOL as the power-on restore mode', () => {
+		const platform = makeFakePlatform();
+		platform.api.registerPlatformAccessories = () => {};
+		new DeviceAccessory({
+			device: { name: 'AC', host: '192.168.1.10' },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			entities: { climate: makeFakeClimateEntity({ supportedModes: [0, 3], state: { mode: 0 } }) },
+			platform,
+		});
+		expect(platform.accessories[0].context.lastTargetState).toBe(3);
 	});
 });
 

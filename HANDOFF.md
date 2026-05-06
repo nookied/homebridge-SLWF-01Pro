@@ -4,15 +4,17 @@
 
 ---
 
-## ⚠️ UPDATE — 2026-05-06 (post-0.5.1)
+## ⚠️ UPDATE — 2026-05-06 (post-0.5.2 + local review)
 
 **The pairing issue was resolved across 0.4.4 → 0.5.1.** The user successfully paired the SLWF child bridge in Apple Home and sees all devices. The fix bundle:
 
 - **0.4.4** — Eve `CurrentPowerConsumption` moved off the standard `HeaterCooler` service onto a linked `Service.Outlet`, which is then `setHiddenService(true)` so it doesn't render as a separate tile in Apple Home but still feeds Eve.app via the HAP database. Schema bump 4 → 5 forces clean accessory recreation on upgrade.
 - **0.5.0** — All companion services (`Humidity`, `OutdoorTemp`, `Power`, `Beeper`, `Display`, `DRY`, `FAN_ONLY`) hidden by default; `autoDiscover` on by default. This drops the per-accessory service count to just `HeaterCooler` for fresh installs, addressing the "service count tolerance" hypothesis. Per-device override semantics flipped to bidirectional so users can selectively re-enable extras.
 - **0.5.1** — Apple-Home renames persist across restarts (`setConfiguredName` only seeds new accessories, not cached ones). Auto-discovered offline devices keep their identity instead of being unregistered (`pruneOrphanedAccessories` early-returns when `autoDiscover` is on).
+- **0.5.2** — Empty Homebridge UI form rows are silently ignored instead of logging host warnings on every restart.
+- **Local post-0.5.2 review** — restore mode now respects advertised capabilities (heat-only devices don't turn back on as COOL), newly-enabled companion services on cached accessories get `ConfiguredName`, and invalid hostless manual entries keep cached accessories instead of allowing destructive pruning.
 
-The diagnostic flow below is preserved for reference if a similar symptom returns. Today's `npm view homebridge-slwf-01pro version` is **0.5.1** (144 unit tests across 7 suites).
+The diagnostic flow below is preserved for reference if a similar symptom returns. Current package version in this repo is **0.5.2**; local review has **159 unit tests across 8 suites**.
 
 ---
 

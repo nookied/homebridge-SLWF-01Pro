@@ -43,7 +43,7 @@
         "default": true
       },
       "disablePowerSensor": {
-        "title": "Hide Power Usage characteristic (Eve.Energy)",
+        "title": "Hide linked Power Usage service (Eve.Energy)",
         "type": "boolean",
         "default": true
       },

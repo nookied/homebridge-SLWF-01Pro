@@ -15,7 +15,7 @@ The upstream plugin works for single-device setups but has a few sharp edges tha
 - **Multi-device command coalescing.** A module-level send timeout meant changing one AC could cancel a pending command on another. Each AC now owns its own debouncer.
 - **Crash on disconnected device.** The upstream `device disconnected` error path referenced an undefined `log` symbol → `ReferenceError` instead of a clean HomeKit error. Fixed.
 - **Auto-discovery via mDNS** — listed `_esphomelib._tcp` services are picked up automatically; you don't need to type six IP addresses for six ACs.
-- **Multi-entity bundling** — humidity, outdoor temperature, power consumption, beeper, display toggle, DRY, and FAN_ONLY all show up in HomeKit when the device exposes them.
+- **Multi-entity bundling** — humidity, outdoor temperature, power consumption, beeper, display toggle, DRY, and FAN_ONLY can be exposed when the device supports them; fresh installs hide the extras by default for a clean Apple Home pairing.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full restoration story.
 
@@ -30,7 +30,7 @@ Anything that publishes a `Climate` entity over the ESPHome native API will work
 | Alpine, Pioneer, Samsung, Toshiba, Zanussi | ~30 brands total — see [smartlight.me](https://smartlight.me/smart-home-devices/wifi-devices/wifi-dongle-air-conditioners-midea-idea-electrolux-for-home-assistant) for the full list |
 | Newer 2024+ AC firmwares with proprietary protocols | May not work — check the manufacturer's compatibility notes before buying |
 
-DRY and FAN_ONLY ESPHome modes are surfaced as **companion `Switch` services** ("AC Dry", "AC Fan Only") next to the main `HeaterCooler` tile. Toggling one ON puts the AC into that mode; toggling OFF restores the previous primary mode (HEAT/COOL/AUTO). Hide via `disableDryMode` / `disableFanOnlyMode`.
+DRY and FAN_ONLY ESPHome modes can be surfaced as **companion `Switch` services** ("AC Dry", "AC Fan Only") next to the main `HeaterCooler` tile. Set `disableDryMode: false` / `disableFanOnlyMode: false` to opt in. Toggling one ON puts the AC into that mode; toggling OFF restores the previous primary mode (HEAT/COOL/AUTO).
 
 ESPHome's **custom fan modes** (`silent`, `turbo` on Midea) and **presets** (`eco`, `boost`, `sleep`, `away`) are not yet surfaced — the plugin only handles the standard fan-modes list. See [ROADMAP.md](ROADMAP.md).
 
@@ -291,7 +291,7 @@ git clone https://github.com/nookied/homebridge-SLWF-01Pro.git
 cd homebridge-SLWF-01Pro
 npm install
 npm run lint                                  # ESLint
-npm test                                      # Jest — 144 unit tests across 7 suites
+npm test                                      # Jest — 159 unit tests across 8 suites
 node -e "require('./index.js')"               # smoke test (loads cleanly)
 ```
 
