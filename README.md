@@ -233,9 +233,9 @@ These are device-side issues, not plugin bugs — listed here so you know what t
 
 ### Apple Home "Connecting..." spinner hangs / "Out of compliance" / accessories invisible after pairing
 
-There's a known intermittent pairing issue under active investigation — see [HANDOFF.md](HANDOFF.md) for the full state of play.
+The 0.4.x intermittent pairing issue was addressed across 0.4.4 → 0.5.1 (Eve power off the standard `HeaterCooler` service, companion services hidden by default, schema-version eviction forcing a clean accessory recreation, ConfiguredName not clobbered on restart). Fresh installs from 0.5.0+ already get the bare-bones config below as the default. The original diagnostic notes are kept in [HANDOFF.md](HANDOFF.md) for reference; the workaround config below is still the right starting point if you hit a similar symptom.
 
-**First-line workaround**: try pairing with all optional services disabled:
+**First-line workaround**: pair with all optional services disabled (this is now the default since 0.5.0):
 
 ```jsonc
 {
@@ -256,7 +256,7 @@ There's a known intermittent pairing issue under active investigation — see [H
 }
 ```
 
-This reduces each AC to just the climate service (heat/cool/fan/swing). Pair the bridge with this config first; once the bridge is paired in Apple Home, re-enable the optional services one at a time, restarting between each.
+This reduces each AC to just the climate service (heat/cool/fan/swing). Pair the bridge first; once the bridge is paired in Apple Home, re-enable the optional services one at a time (set the relevant `disable*` flag to `false` either globally or per-device), restarting between each.
 
 If pairing still hangs even with this minimal config, the issue is at a different layer — see the **Pairing diagnostic flow** in [QA_TESTS.md §7](QA_TESTS.md). Most likely:
 - Bridge HAP pairing state is stale → reset by deleting `AccessoryInfo.<bridgeId>.json` and `IdentifierCache.<bridgeId>.json` under your Homebridge `persist/` directory, then restart.
@@ -291,7 +291,7 @@ git clone https://github.com/nookied/homebridge-SLWF-01Pro.git
 cd homebridge-SLWF-01Pro
 npm install
 npm run lint                                  # ESLint
-npm test                                      # Jest — 78 unit tests
+npm test                                      # Jest — 144 unit tests across 7 suites
 node -e "require('./index.js')"               # smoke test (loads cleanly)
 ```
 

@@ -1,6 +1,6 @@
 # QA — Manual pre-release checklist
 
-Run this on the real Homebridge host before tagging a release. There are no automated tests yet, so this is the only line of defence against regressions on real ESPHome hardware.
+Run this on the real Homebridge host before tagging a release. Jest covers the pure helpers and HAP shape (144 unit tests as of 0.5.1); this checklist is the line of defence against regressions on real ESPHome hardware that the unit suite can't see.
 
 Budget: ~10 minutes per release.
 
@@ -13,7 +13,7 @@ Budget: ~10 minutes per release.
 - [ ] `CHANGELOG.md` has an entry for the new version with date
 - [ ] `package.json` `repository.url` matches the GitHub repo URL exactly (sigstore provenance is strict — see CHANGELOG)
 - [ ] `npm run lint` clean
-- [ ] `npm test` — all unit tests pass (currently 78)
+- [ ] `npm test` — all unit tests pass (144 as of 0.5.1; bump this number alongside any test additions)
 - [ ] `node -e "require('./index.js')"` smoke test exits 0
 - [ ] Working git SHA noted for rollback: `_______________`
 
@@ -47,7 +47,7 @@ Open the iOS Home app:
 - [ ] Each tile shows the current temperature within ±1 °C of the AC's display
 - [ ] Each tile shows the correct active/inactive state matching the AC's actual state
 - [ ] Tap a tile to open it: target/current temperatures, mode buttons, fan-speed slider, swing toggle (if supported) all visible
-- [ ] Accessory info (long-press tile → ⓘ): Manufacturer = `<deviceInfo.manufacturer>` (falls back to "ESPHome"), Model = `<deviceInfo.model>` (falls back to entity name), Serial = `<deviceInfo.macAddress>` (falls back to ESPHome unique id), Firmware = `<deviceInfo.esphomeVersion>` if present
+- [ ] Accessory info (long-press tile → ⓘ): Manufacturer = `<deviceInfo.manufacturer>` (falls back to `SMLIGHT`), Model = `<deviceInfo.model>` (falls back to entity name, then `SLWF-01Pro`), Serial = `<deviceInfo.macAddress>` (falls back to deriveDeviceId result), Firmware = `<deviceInfo.esphomeVersion>` if present (sanitized to SemVer-ish)
 
 ## 3. Control — single AC (do these for ONE AC first)
 

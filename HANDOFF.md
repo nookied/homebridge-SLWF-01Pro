@@ -1,17 +1,27 @@
-# Handoff — open pairing issue
+# Handoff — pairing issue (historical brief)
 
-> This file is **not** shipped to npm (excluded by `package.json` `files`). It's a living brief for whoever picks this project up next.
+> This file is **not** shipped to npm (excluded by `package.json` `files`). Originally a live brief for the open pairing problem at v0.4.3; kept as historical context for the diagnostic flow.
 
 ---
 
-## Quick status
+## ⚠️ UPDATE — 2026-05-06 (post-0.5.1)
 
-- **Latest published:** `homebridge-slwf-01pro@0.4.3` (npm + GitHub Release).
+**The pairing issue was resolved across 0.4.4 → 0.5.1.** The user successfully paired the SLWF child bridge in Apple Home and sees all devices. The fix bundle:
+
+- **0.4.4** — Eve `CurrentPowerConsumption` moved off the standard `HeaterCooler` service onto a linked `Service.Outlet`, which is then `setHiddenService(true)` so it doesn't render as a separate tile in Apple Home but still feeds Eve.app via the HAP database. Schema bump 4 → 5 forces clean accessory recreation on upgrade.
+- **0.5.0** — All companion services (`Humidity`, `OutdoorTemp`, `Power`, `Beeper`, `Display`, `DRY`, `FAN_ONLY`) hidden by default; `autoDiscover` on by default. This drops the per-accessory service count to just `HeaterCooler` for fresh installs, addressing the "service count tolerance" hypothesis. Per-device override semantics flipped to bidirectional so users can selectively re-enable extras.
+- **0.5.1** — Apple-Home renames persist across restarts (`setConfiguredName` only seeds new accessories, not cached ones). Auto-discovered offline devices keep their identity instead of being unregistered (`pruneOrphanedAccessories` early-returns when `autoDiscover` is on).
+
+The diagnostic flow below is preserved for reference if a similar symptom returns. Today's `npm view homebridge-slwf-01pro version` is **0.5.1** (144 unit tests across 7 suites).
+
+---
+
+## Quick status (frozen at v0.4.3 — pre-fix)
+
+- **Latest published at the time of writing:** `homebridge-slwf-01pro@0.4.3` (npm + GitHub Release).
 - **Test suite:** 130 unit tests passing across 6 suites. CI on Node 18.20.4 / 20.15.1 / 22.x / 24.x. Tag-driven release workflow is in place and working.
 - **Plugin runtime:** functional. mDNS auto-discovery finds devices, accessories register correctly in Homebridge, all HAP-best-practices we know of are applied.
-- **Open issue:** the user can't get the SLWF child bridge to **finalize pairing** in Apple Home. Either gets a "Connecting…" spinner that hangs indefinitely, or pairs but Apple Home shows "non-compliant" / "Not Responding" state.
-
-This is the immediate focus for the next coding session.
+- **Open issue (now resolved — see UPDATE above):** the user can't get the SLWF child bridge to **finalize pairing** in Apple Home. Either gets a "Connecting…" spinner that hangs indefinitely, or pairs but Apple Home shows "non-compliant" / "Not Responding" state.
 
 ---
 

@@ -6,27 +6,27 @@ The fork was taken at upstream 0.0.4 because the upstream's release cadence (las
 
 ---
 
-## TL;DR — three bets
+## TL;DR — where we're aiming
 
-1. **Stabilise the multi-feature 0.1.0** (Unreleased → 0.1.0). Auto-discovery, multi-entity bundling, HEAT_COOL fix, supplementary sensors/switches, DRY/FAN_ONLY mode tiles, Eve.Energy + history, StatusFault/Active. 78 unit tests passing. **Ship after manual QA on a real SLWF-01Pro install.**
-2. **Add CI + GitHub release workflow.** Tests are in place; just need `.github/workflows/ci.yml` (lint + test on Node 22/24) and `release.yml` (tag-driven npm publish + GitHub Release).
-3. **Apply for Homebridge Verified.** Currently meeting most requirements (dynamic platform ✓, config.schema ✓, no telemetry ✓, errors caught ✓, tests ✓). Outstanding: tag-driven release workflow + a few stable weeks in the wild + npm rename to `homebridge-slwf-01pro`.
-
-Everything else is incremental coverage of ESPHome features (custom fan modes, presets, two-point temp).
+1. **Stable 0.5.x baseline.** The 0.4.x pairing concerns are resolved (user-confirmed paired); 0.5.x flipped defaults so a fresh install gives a clean Apple Home and per-device overrides became symmetric. Restart-resilience for Apple Home renames + offline auto-discovered devices landed in 0.5.1.
+2. **Apply for Homebridge Verified** once 0.5.x has a few stable weeks in the wild. All requirements are already met (dynamic platform ✓, config.schema ✓, no telemetry ✓, errors caught ✓, tests ✓, tag-driven release ✓, npm name correct ✓).
+3. **Feature coverage** — custom fan modes (`silent`/`turbo`), presets (`eco`/`boost`/`sleep`/`away`), two-point target temperature. See M4/M5 below.
 
 ---
 
-## Where we are today (0.4.3 published)
+## Where we are today (0.5.1 published)
 
-✅ **Shipped on npm as `homebridge-slwf-01pro@0.4.3` with provenance.** Tag-driven release pipeline via GitHub Actions. CI runs lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x. **130 unit tests passing** across 6 suites (state, classifyEntity, discovery, configSchema, configSchemaValidation, hapCompliance).
+✅ **Shipped on npm as `homebridge-slwf-01pro@0.5.1` with provenance.** Tag-driven release pipeline via GitHub Actions. CI runs lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x. **144 unit tests passing** across 7 suites (state, classifyEntity, discovery, configSchema, configSchemaValidation, hapCompliance, pruning).
 
-✅ Dynamic platform, per-device debouncing, mode-mapping refactor with HEAT_COOL handling. **mDNS auto-discovery.** **Multi-entity bundling** (Climate + sensors + switches + buttons → one HomeKit accessory) with `HumiditySensor`, outdoor `TemperatureSensor`, Eve.Energy power, Beeper switch, Display switch, DRY/FAN_ONLY mode tiles, all with per-device disable flags. `StatusActive`/`StatusFault` mirror connection state.
+✅ Dynamic platform, per-device debouncing, mode-mapping refactor with HEAT_COOL handling. **mDNS auto-discovery on by default** (since 0.5.0). **Multi-entity bundling** (Climate + sensors + switches + buttons → one HomeKit accessory) with `HumiditySensor`, outdoor `TemperatureSensor`, hidden-Outlet Eve.Energy power, Beeper switch, Display switch, DRY/FAN_ONLY mode tiles, all hidden by default with bidirectional per-device override. `StatusActive`/`StatusFault` mirror connection state.
 
-✅ **HAP best practices** through 0.4.3: `Categories.AIR_CONDITIONER`, `setPrimaryService(true)`, `addLinkedService` for companion services, `ConfiguredName` on every service, no-op `Identify` handler, `setProps` NaN-safety, `RotationSpeed.minStep` sized to fan-mode count, mode-fallthrough uses `validValues[0]` instead of hardcoded AUTO, `FirmwareRevision` SemVer-sanitized, `ACCESSORY_SCHEMA_VERSION = 4` evicts older cached accessories on upgrade.
+✅ **HAP best practices** through 0.5.1: `Categories.AIR_CONDITIONER`, `setPrimaryService(true)`, `addLinkedService` for companion services, `ConfiguredName` seeded on first registration only (Apple-Home renames persist across restarts), no-op `Identify` handler, `setProps` NaN-safety, `RotationSpeed.minStep` sized to fan-mode count, mode-fallthrough uses `validValues[0]`, `FirmwareRevision` SemVer-sanitized, Eve `CurrentPowerConsumption` on a hidden linked Outlet (not on the standard `HeaterCooler` service), `ACCESSORY_SCHEMA_VERSION = 5` evicts older cached accessories on upgrade.
+
+✅ **Restart-resilience** since 0.5.1: Apple Home renames stick across Homebridge restarts; auto-discovered devices that are offline at restart keep their HomeKit identity (name/room/automations) instead of being unregistered.
 
 ✅ **Three layers of independence from upstream `homebridge-esphome-ac`**: distinct npm name (`homebridge-slwf-01pro`), distinct platform identifier (`SLWFOnePro`), distinct UUID namespace (`homebridge-slwf-01pro:<deviceId>`). Both plugins can run side-by-side on the same Homebridge.
 
-🔴 **Active issue, blocks release of new features**: see [HANDOFF.md](HANDOFF.md). Apple Home pairing of the SLWF child bridge intermittently fails ("Connecting…" hangs OR "non-compliant" / accessories invisible) despite the plugin being HAP-best-practice clean. Hypotheses (untested): too many secondary services per accessory (8) for Apple Home iOS 17+; OR the Eve.Energy `CurrentPowerConsumption` custom characteristic on a standard `HeaterCooler` service.
+✅ **Pairing issue from 0.4.x resolved.** User successfully paired the bridge after the 0.4.4 + 0.5.0 fixes landed. [HANDOFF.md](HANDOFF.md) is kept as historical context for the diagnostic flow.
 
 ⚠️ Pending feature gaps: custom fan modes (`silent`/`turbo`), presets (`eco`/`boost`/`sleep`/`away`), two-point target temperature. Encrypted ESPHome devices skip auto-discovery (mDNS doesn't broadcast the Noise key).
 

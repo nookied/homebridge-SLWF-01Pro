@@ -13,10 +13,10 @@ This file is the canonical persistent memory for this project. Any assistant/age
 **Repo:** [`https://github.com/nookied/homebridge-SLWF-01Pro`](https://github.com/nookied/homebridge-SLWF-01Pro) — **maintained fork**
 **Original (upstream):** [`nitaybz/homebridge-esphome-ac`](https://github.com/nitaybz/homebridge-esphome-ac) — last release 0.0.4. The `upstream` git remote was deliberately removed in v0.2.0; the fork is fully independent.
 **License:** MIT (preserved from original)
-**Current version:** **0.4.3** — published on npm with provenance. 130 unit tests passing. CI on Node 18.20.4 / 20.15.1 / 22.x / 24.x. Tag-driven release pipeline. Local unreleased work after 0.4.3 moves Eve power monitoring to a linked, hidden `Service.Outlet`, bumps the accessory schema to 5, and has 133 unit tests passing locally.
+**Current version:** **0.5.1** — published on npm with provenance. 144 unit tests passing across 7 suites. CI on Node 18.20.4 / 20.15.1 / 22.x / 24.x. Tag-driven release pipeline. `ACCESSORY_SCHEMA_VERSION = 5`.
 **Engines:** Homebridge `^1.8.0 || ^2.0.0`; Node `^18.20.4 || ^20.15.1 || ^22.0.0 || ^24.0.0`
 
-> **⚠️ Open issue at the time of this writing — see [HANDOFF.md](HANDOFF.md):** Apple Home pairing of the SLWF child bridge intermittently fails ("Connecting…" hangs OR "non-compliant" / accessories invisible). Plugin code is HAP-best-practice clean (130 tests verify in 0.4.3); local unreleased work removes the Eve.Energy custom characteristic from the standard HeaterCooler service. Remaining leading hypotheses: service count per accessory exceeding Apple Home iOS 17+ tolerance, stale bridge HAP pairing state, or network reachability of the child bridge port. Test path: bare-bones config (all `disable*` flags `true`) before re-enabling services one at a time.
+> **Pairing status (resolved enough to use):** The child-bridge pairing issue from the 0.4.x audit (see [HANDOFF.md](HANDOFF.md) for original brief) was addressed across 0.4.4 → 0.5.1. The user successfully paired and sees devices. The fix bundle: Eve power moved off the `HeaterCooler` service onto a linked, hidden `Service.Outlet` (0.4.4); companion services hidden by default to keep visible service count down (0.5.0); ConfiguredName preserved across restarts so Apple Home renames stick (0.5.1); auto-discovered offline devices no longer pruned so Apple Home identity survives reboots (0.5.1). Per-device disable flags now override platform defaults *bidirectionally* (0.5.0).
 
 ### What "SLWF-01Pro" is
 
@@ -52,19 +52,23 @@ The plugin opens an ESPHome native-API connection (TCP, default port 6053) to ea
 ```
 homebridge-SLWF-01Pro/
 ├── index.js                              Homebridge entry; registerPlatform(.., true) — dynamic
-│   ├── module.exports(api)                  api.registerPlatform(PLUGIN_NAME, PLATFORM_NAME, ESPHomeAC, true)
-│   └── ESPHomeAC                            Dynamic platform class
+│   ├── module.exports(api)                  api.registerPlatform(PLUGIN_NAME, PLATFORM_NAME, SLWFOnePro, true)
+│   └── SLWFOnePro                           Dynamic platform class (renamed from ESPHomeAC in v0.4.0)
 │       ├── constructor(log, config, api)        Reads config (devices[], debug, autoDiscover, disable* flags);
+│       │                                          applies clean-install defaults (autoDiscover/disable* default true);
 │       │                                          sets up log.easyDebug; on 'didFinishLaunching' → ESPHome.init()
-│       └── configureAccessory(accessory)        Stash cached PlatformAccessory in this.accessories[]
+│       └── configureAccessory(accessory)        Stash cached PlatformAccessory; route schemaVersion mismatches to staleAccessories
 │
 ├── lib/
 │   ├── esphome.js                        Async orchestrator: manual + discovered devices → Client per device → DeviceAccessory
 │   │   ├── init()                              Build device list (manual + autoDiscover), spawn one Client per device,
 │   │   │                                          prune orphaned cached accessories
+│   │   ├── evictStaleSchemaAccessories()       Unregister accessories whose schemaVersion < ACCESSORY_SCHEMA_VERSION
 │   │   ├── spawnClient(platform, device)       Per-device: connect, attach connected/disconnected/error/initialized,
 │   │   │                                          call setConnectedStatus on the bound DeviceAccessory
-│   │   └── pruneOrphanedAccessories(...)       Unregister cached accessories whose host isn't in the live list
+│   │   └── pruneOrphanedAccessories(platform, liveHosts)
+│   │                                            Unregister cached accessories not in liveHosts. Early-returns when
+│   │                                            autoDiscover is on so transient-offline devices keep their identity.
 │   │
 │   ├── discovery.js                      mDNS browse helper
 │   │   ├── discoverDevices({timeout, log})     Promise<DiscoveredDevice[]>; calls @2colors Discovery proxy
@@ -127,11 +131,13 @@ homebridge-SLWF-01Pro/
 │       ├── state.test.js                 Truth tables for all mappers + capability checks + deriveDeviceId (61 tests)
 │       ├── classifyEntity.test.js        Entity classification + bundling (17 tests)
 │       ├── discovery.test.js             prettyNameFromHostname + dedupeDevices (9 tests)
-│       ├── configSchema.test.js          Structural schema audit + drift checks vs. lib/constants.js (13 tests)
+│       ├── configSchema.test.js          Structural schema audit + drift checks vs. lib/constants.js (15 tests)
 │       ├── configSchemaValidation.test.js  ajv-based config-schema validation (20 tests)
-│       └── hapCompliance.test.js         Mock HAP shim: AccessoryCategory, setPrimaryService, addLinkedService,
-│                                            ConfiguredName, Identify handler, NaN-safe setProps, Eve power Outlet isolation,
-│                                            RotationSpeed.minStep, schema-version single-sourcing
+│       ├── hapCompliance.test.js         Mock HAP shim: AccessoryCategory, setPrimaryService, addLinkedService,
+│       │                                   ConfiguredName seeding + persistence, Identify handler, NaN-safe setProps,
+│       │                                   Eve power on hidden Outlet, RotationSpeed.minStep, schema-version
+│       │                                   single-sourcing, bidirectional per-device override (18 tests)
+│       └── pruning.test.js               pruneOrphanedAccessories: skip when autoDiscover on, prune when off (4 tests)
 │
 ├── .github/workflows/
 │   ├── ci.yml                            Lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x, every push + PR
@@ -153,8 +159,8 @@ homebridge-SLWF-01Pro/
 
 ## How it runs
 
-1. Homebridge calls `module.exports(api)` → `api.registerPlatform("homebridge-slwf-01pro", "SLWFOnePro", ESPHomeAC, true)` (4th arg `true` = dynamic platform). The platform class is named `ESPHomeAC` internally; the user-facing identifier is `SLWFOnePro`.
-2. Homebridge instantiates `ESPHomeAC(log, config, api)`. The constructor reads config (`name`, `debug`, `devices[]`, `autoDiscover`, `discoveryTimeout`, all `disable*` flags), sets up `this.accessories = []` and `this.esphomeDevices = {}` (keyed by `device.host`), then registers `api.on('didFinishLaunching', ...)`. On `didFinishLaunching`, `lib/esphome.js init()` runs `detectOrphanedAccessories()` first (best-effort scan of the bridge's `cachedAccessories.*` for upstream/legacy entries — logs warnings, never throws).
+1. Homebridge calls `module.exports(api)` → `api.registerPlatform("homebridge-slwf-01pro", "SLWFOnePro", SLWFOnePro, true)` (4th arg `true` = dynamic platform). The class and the user-facing platform identifier are both `SLWFOnePro` since 0.4.0; pre-0.4.0 the class was `ESPHomeAC`.
+2. Homebridge instantiates `SLWFOnePro(log, config, api)`. The constructor reads config (`name`, `debug`, `devices[]`, `autoDiscover`, `discoveryTimeout`, all `disable*` flags), applies clean-install defaults via `??` (since 0.5.0 `autoDiscover` and every `disable*` flag default to `true` when the user hasn't set them), sets up `this.accessories = []`, `this.staleAccessories = []`, `this.esphomeDevices = {}` (keyed by `device.host`), then registers `api.on('didFinishLaunching', ...)`. On `didFinishLaunching`, `lib/esphome.js init()` runs `evictStaleSchemaAccessories()` first to unregister cached accessories whose `context.schemaVersion < ACCESSORY_SCHEMA_VERSION`, then `detectOrphanedAccessories()` (best-effort scan of the bridge's `cachedAccessories.*` for upstream/legacy entries — logs warnings, never throws).
 3. For each accessory in Homebridge's on-disk cache, `configureAccessory(accessory)` is called synchronously — we stash it in `this.accessories[]`. Service handlers are NOT bound here.
 4. After all `configureAccessory` calls, `didFinishLaunching` fires → `await esphome.init()`:
    - Build the **device list**: manual `this.devices[]` first, then if `autoDiscover` is true, call `discovery.discoverDevices({ timeout })` to mDNS-browse `_esphomelib._tcp` and append any discovered devices not already present (deduped by host, case-insensitive).
@@ -183,7 +189,7 @@ homebridge-SLWF-01Pro/
    - `entities.climate.on('state', updateClimateState)` — main path. Updates Active / CurrentTemperature / Target/CurrentHeaterCoolerState / SwingMode / RotationSpeed and `syncModeSwitches()` for DRY/FAN_ONLY tile state.
    - Each optional entity (`humiditySensor`, `outdoorTempSensor`, `powerSensor`, `beeperSwitch`) has its own `'state'` listener pushing to its respective service/characteristic. Power updates the linked Outlet's Eve `CurrentPowerConsumption` and `OutletInUse`.
    - On disconnect, `setConnectedStatus(false)` flips StatusFault to GENERAL_FAULT (red badge in HomeKit) and StatusActive to false. Reconnect → reverts.
-8. **Cleanup at startup**: After spawning all clients, `pruneOrphanedAccessories` unregisters any cached accessory whose `context.host` is not in the current live host list.
+8. **Cleanup at startup**: After spawning all clients, `pruneOrphanedAccessories(platform, liveHosts)` runs. With `autoDiscover` on (default) it early-returns — transient-offline auto-discovered devices keep their HomeKit identity. With `autoDiscover` off it unregisters any cached accessory whose `context.host` isn't in `liveHosts` (= manual `devices[]`).
 
 ## ESPHome Climate cheat sheet
 
@@ -266,7 +272,7 @@ The `@2colors/esphome-native-api` exposes ESPHome's protobuf API. Climate entiti
 
 Per-device disable flags override the platform-wide flag **in either direction**. If a per-device flag is set explicitly (true OR false), it wins; otherwise the device inherits the platform default. This is what `lib/DeviceAccessory.js settingDisabled(key)` implements: `device[key] !== undefined ? Boolean(device[key]) : Boolean(platform[key])`. Since 0.5.0 the platform defaults are all `true` (everything hidden), so the symmetric override is the only way to opt a single AC back into a service.
 
-Heads-up about `autoDiscover`: when it's on and discovers a device, the device is registered with a stable UUID and cached on disk. When it's later turned **off**, the next `init()` builds `liveHosts` from manual `devices[]` only, so any auto-discovered host that isn't also in `devices[]` is no longer "live" and `pruneOrphanedAccessories(platform, liveHosts)` unregisters it. **To preserve auto-discovered devices when disabling discovery, copy them into `devices[]` first.**
+Heads-up about `autoDiscover`: when it's on (the default since 0.5.0) and a device is discovered, the device is registered with a stable UUID and cached on disk. While `autoDiscover` stays on, transient-offline devices are kept (the prune step early-returns) so a power-cycled AC doesn't lose its HomeKit identity. When the user later turns `autoDiscover` **off**, `liveHosts` reduces to manual `devices[]` only and `pruneOrphanedAccessories` unregisters anything not in that list. **To preserve auto-discovered devices when disabling discovery, copy them into `devices[]` first** (or accept that they'll be removed). Permanent removal while `autoDiscover` is on is via Homebridge UI → Remove Single Cached Accessory.
 
 When `autoDiscover` is on, discovered devices that aren't in `devices[]` get a name derived from the mDNS hostname (e.g. `air-conditioner-fae810` → `Air Conditioner Fae810`); rename them in HomeKit if you want a friendlier label. Encrypted ESPHome devices (`api: encryption: key:`) need a manual `devices[]` entry — the Noise key isn't broadcast over mDNS.
 
@@ -296,17 +302,14 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 
 ## Known issues / tech debt
 
-### Open — immediate priority
-1. **🔴 Apple Home pairing intermittently fails** — see [HANDOFF.md](HANDOFF.md). User reports either (a) "Connecting…" spinner that hangs indefinitely, or (b) bridge pairs but is "non-compliant" / accessories invisible. The plugin code is HAP-best-practice-clean as of 0.4.3 (130 tests verify category, primary service, linked services, ConfiguredName, Identify handler, NaN-safe setProps). Local unreleased work removes one suspected trigger by moving Eve.Energy `CurrentPowerConsumption` from the standard `HeaterCooler` service to a linked `Service.Outlet`, with schema version 5 forcing clean accessory recreation. Remaining hypotheses: too many secondary services per accessory for Apple Home iOS 17+, stale bridge HAP state, or child-bridge TCP reachability.
-
 ### Open — feature gaps
-2. **Custom fan modes (`silent`, `turbo`) and presets (`eco`, `boost`, `sleep`, `away`) are not exposed.** Midea-platform devices commonly advertise these via `supportedCustomFanModesList`/`supportedPresetsList`. Roadmap M4.
-3. **Two-point target temperature is not used.** Even when `config.supportsTwoPointTargetTemperature === true`, the plugin sends only single `target_temperature`. AUTO mode in HomeKit uses both `HeatingThresholdTemperature` and `CoolingThresholdTemperature` — currently both write to the same single field. Roadmap M5.
-4. **Intake-mounted sensor inaccuracy.** Device-side issue (the SLWF-01Pro reads cold-air-blast not room temp). Mitigated by ESPHome's `midea_ac.follow_me` action — Home-Assistant-only and needs a hardware mod. Out of scope for this plugin.
-5. **Encrypted ESPHome devices skip auto-discovery.** mDNS doesn't broadcast the Noise encryption key, so encrypted devices need a manual `devices[]` entry. Documented in README.
-6. **Heuristic entity classification.** Beeper/humidity/etc. are matched by name pattern. If a user customizes their ESPHome YAML to use unusual entity names, the entity won't be classified. Could add explicit `entityMap` config option later.
+1. **Custom fan modes (`silent`, `turbo`) and presets (`eco`, `boost`, `sleep`, `away`) are not exposed.** Midea-platform devices commonly advertise these via `supportedCustomFanModesList`/`supportedPresetsList`. Roadmap M4.
+2. **Two-point target temperature is not used.** Even when `config.supportsTwoPointTargetTemperature === true`, the plugin sends only single `target_temperature`. AUTO mode in HomeKit uses both `HeatingThresholdTemperature` and `CoolingThresholdTemperature` — currently both write to the same single field. Roadmap M5.
+3. **Intake-mounted sensor inaccuracy.** Device-side issue (the SLWF-01Pro reads cold-air-blast not room temp). Mitigated by ESPHome's `midea_ac.follow_me` action — Home-Assistant-only and needs a hardware mod. Out of scope for this plugin.
+4. **Encrypted ESPHome devices skip auto-discovery.** mDNS doesn't broadcast the Noise encryption key, so encrypted devices need a manual `devices[]` entry. Documented in README.
+5. **Heuristic entity classification.** Beeper/humidity/etc. are matched by name pattern. If a user customizes their ESPHome YAML to use unusual entity names, the entity won't be classified. Could add explicit `entityMap` config option later.
 
-### Resolved across 0.1.0 → 0.4.3
+### Resolved across 0.1.0 → 0.5.1
 - **Module-level `sendTimeout` shared across devices.** Multi-AC users could lose commands when changing one AC then another within 600 ms. Now a per-device `that._sendTimeout`.
 - **Undefined `log` ReferenceError on disconnect.** `stateManager.js` referenced bare `log` in the device-disconnected error path; would crash the call instead of returning a clean HAP error. Fixed to `that.log.error` and rejection now uses `HapStatusError`.
 - **Stacked `connected`/`disconnected` listeners.** Original code attached them inside the `entity.once('state')` callback — every Climate entity (and every reconnect) added another pair. Moved to platform scope, attached once per Client.
@@ -321,7 +324,11 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 - **Config UI "validation failed" warning** *(0.3.2/0.3.3)*. `config.schema.json` modernized to canonical JSON Schema (`required: [...]` arrays at parent level, no per-property `required: false`). ajv-based test suite with 20 sample configs.
 - **`Categories.AIR_CONDITIONER` was never set on accessories** *(0.4.1)*. Defaulting to `OTHER (1)` could cause Apple Home iOS 16+ to silently hide accessories. Companion services (sensors + switches) are now `addLinkedService`-linked to the primary HeaterCooler.
 - **HAP-compliance audit fixes** *(0.4.3)*. `setProps NaN`-guard with default visual temp bounds; mode-fallthrough uses `validValues[0]` instead of hardcoded AUTO; `ConfiguredName` on every companion service; `Identify` handler bound; `RotationSpeed.minStep` sized to fan-mode count; `ACCESSORY_SCHEMA_VERSION` consolidated to `lib/constants.js` (single source). Mock-HAP-shim test suite (`test/unit/hapCompliance.test.js`, 9 tests) prevents regression.
-- **Eve power characteristic attached directly to HeaterCooler** *(unreleased)*. Power monitoring now uses a linked `Service.Outlet` named `<AC> Power`, marked hidden so Apple Home doesn't render it as a separate tile while Eve.app and other HAP-direct clients still read `CurrentPowerConsumption`. Startup also removes the legacy Eve characteristic from cached HeaterCooler services. `ACCESSORY_SCHEMA_VERSION` is bumped to 5 so users get the corrected service shape on upgrade.
+- **Eve power characteristic attached directly to HeaterCooler** *(0.4.4)*. Power monitoring now uses a linked `Service.Outlet` named `<AC> Power`, marked hidden via `setHiddenService(true)` so Apple Home doesn't render it as a separate tile while Eve.app and other HAP-direct clients still read `CurrentPowerConsumption`. Startup also removes the legacy Eve characteristic from cached `HeaterCooler` services. `ACCESSORY_SCHEMA_VERSION` is bumped to 5 so users get the corrected service shape on upgrade. Snap-back `On` handler retained as a fallback for HAP-NodeJS versions predating `setHiddenService`.
+- **Apple Home pairing was intermittently failing** *(0.4.4 + 0.5.0; user-confirmed paired)*. Multi-pronged fix: Eve power off the standard `HeaterCooler` service (0.4.4), companion services hidden by default to keep accessory service count down (0.5.0), schema bump 4 → 5 forcing a clean accessory recreation. The user successfully paired the bridge after these landed. See HANDOFF.md for the original diagnostic flow (kept as historical reference).
+- **Default-config UX overhaul** *(0.5.0)*. `autoDiscover` defaults to `true` and every `disable*` flag defaults to `true`, so a fresh install gives a clean Apple Home with just one HeaterCooler tile per AC. `index.js` switched from `||` to `??` so explicit `false` is honoured. Per-device override semantics now symmetric: `device[key] !== undefined ? Boolean(device[key]) : Boolean(platform[key])` — required so users can keep the global hide and selectively enable a service for a single AC.
+- **Apple Home rename clobbered on every restart** *(0.5.1)*. `setConfiguredName` now early-returns when `!this.isNewAccessory`, so a cached accessory keeps whatever HAP/Apple Home has stored. Room assignment was always safe (Apple Home stores it server-side, keyed by stable accessory UUID).
+- **Auto-discovered offline devices were unregistered on restart** *(0.5.1)*. `pruneOrphanedAccessories` now early-returns when `platform.autoDiscover` is on. An offline AC stays in the cache as "Not Responding" instead of being dropped (which would have lost the user's name/room/automations). With `autoDiscover` off, manual `devices[]` is the source of truth and the legacy prune behaviour is preserved (devices removed from config are unregistered).
 
 ### By design (won't fix)
 - **No upstream PR-back.** The fork is intentionally divergent and the upstream's release cadence (last release ~2 years ago) doesn't justify the round-trip.
@@ -378,7 +385,7 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 | `CHANGELOG.md` | Release history (Keep a Changelog) |
 | `ROADMAP.md` | Development plan (M1–M5) |
 | `HANDOFF.md` | Active-issue brief for the next coding instance (open pairing problem) |
-| `test/unit/*.test.js` | Jest unit tests (78 currently) |
+| `test/unit/*.test.js` | Jest unit tests (144 currently across 7 suites) |
 | `QA_TESTS.md` | Manual pre-release checklist |
 | `AGENTS.md` | Pointer to this file |
 | `CLAUDE.md` | This file — project memory |
