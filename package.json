@@ -1,7 +1,7 @@
 {
   "name": "homebridge-slwf-01pro",
   "description": "Homebridge plugin for the SMLIGHT SLWF-01Pro Wi-Fi dongle and other ESPHome Climate entities. Auto-discovery, multi-entity bundling, and full Midea-protocol AC support.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/nookied/homebridge-SLWF-01Pro.git"

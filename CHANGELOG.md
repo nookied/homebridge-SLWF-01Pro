@@ -7,7 +7,21 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
-## [0.1.0] — Unreleased
+## [0.1.1] — 2026-05-06
+
+Workflow-only patch.
+
+### Fixed
+
+- **`release.yml` `Create GitHub Release` step crashed on multi-line CHANGELOG content.** The 0.1.0 release workflow successfully published to npm but the GitHub Release step failed because the extracted release notes were inlined into the bash command via `--notes "${{ ... }}"`, where the shell parsed `*` (glob), `[…]` (bracket expansion), backticks (command substitution), `/` (path lookup) etc. as commands — producing dozens of `command not found` errors and exiting non-zero. (The 0.1.0 GitHub Release was created manually as a recovery.) The step now writes the extracted notes to `release-notes.md` and passes `--notes-file release-notes.md` to `gh release create`. No shell interpolation, no metacharacter risk. This release is the end-to-end validation that the fix works.
+
+### Internal
+
+- No code or config changes for users — `homebridge-slwf-01pro@0.1.1` and `@0.1.0` are functionally identical. Patch bump documents the workflow fix and gives the next release a clean release-notes path.
+
+---
+
+## [0.1.0] — 2026-05-06
 
 First fork release — bug fixes, full multi-entity rewrite, and a substantial feature expansion. Adds mDNS auto-discovery, multi-entity HomeKit composition (humidity / outdoor temperature / power / beeper / display switches), DRY + FAN_ONLY mode tiles, Eve.Energy power graphs, and HEAT_COOL-mode AC support. Three independent code-review passes drove a follow-up cleanup.
 
