@@ -7,6 +7,32 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [0.3.3] — 2026-05-06
+
+Fix the "config validation failed, you can still save your changes" warning shown by the Homebridge UI when editing the plugin's settings.
+
+### Fixed
+
+- **`config.schema.json` used the legacy per-property `"required": true/false` Homebridge convention**, which modern ajv (used by recent `homebridge-config-ui-x` versions) reports as a non-standard JSON Schema construct. Migrated to canonical JSON Schema:
+  - Removed all `"required": false` annotations (redundant — JSON Schema treats unlisted properties as optional by default).
+  - Replaced per-device `"required": true` on `name`/`host` with the parent-level `"required": ["name", "host"]` array on the device item schema.
+  - Added `minLength: 1` on required string fields so empty values are explicitly rejected (matches what the form validator was already enforcing).
+- **The `Devices` array's items had `"title": "Devices"` (plural)**, which the UI rendered as the same title for every entry; changed to `"Device"` (singular).
+
+### Added
+
+- **`test/unit/configSchemaValidation.test.js`** — runs the live `config.schema.json` through ajv against 20 sample configs, including the bundled `config-sample.json`, common partial configs, and explicit error cases (missing required fields, out-of-range numerics, wrong types). Catches schema regressions that would surface as validation warnings in the UI.
+  - 120 unit tests now pass (up from 100).
+- **`ajv` and `ajv-formats` as devDependencies** — vendored only for the test suite, not shipped in the runtime tarball.
+
+### Why the warning matters
+
+`homebridge-config-ui-x` validates saved config against the plugin's `config.schema.json` after every form save. When the schema is well-formed but uses non-standard JSON Schema constructs, ajv flags them and the UI shows the "config validation failed" warning even though the actual saved config is fine. The user could still save their changes, but the warning is alarming and obscures real validation problems (like a forgotten required field).
+
+This release modernizes the schema to canonical JSON Schema syntax, eliminating the false-positive warning. The ajv-based test suite ensures we don't regress.
+
+---
+
 ## [0.3.2] — 2026-05-06
 
 Config-schema polish + a regression-prevention test suite for the Homebridge UI form.
