@@ -32,7 +32,11 @@ Compatible AC brands (per SMLIGHT): Midea, Idea, Electrolux, Beko, Neoclima, Bos
 ### Fork rules
 
 - This is a **maintained fork published to npm under a distinct name** (`homebridge-slwf-01pro`). The upstream (`homebridge-esphome-ac`) is unaffected and still on npm at 0.0.4.
-- **Both the npm package name AND the Homebridge platform identifier are distinct from upstream** (npm: `homebridge-slwf-01pro`; platform: `SLWFOnePro` since v0.2.0). This guarantees no cache collisions or config-namespace conflicts when both plugins are installed on the same Homebridge.
+- **Three layers of independence from upstream** (`homebridge-esphome-ac`):
+  1. **npm name**: `homebridge-slwf-01pro` (distinct package on npm).
+  2. **Platform identifier**: `SLWFOnePro` (since v0.2.0; users' `config.json` `"platform"` key).
+  3. **HomeKit UUID namespace**: UUIDs are derived from `homebridge-slwf-01pro:<deviceId>` (since v0.3.0), so even when both plugins discover the same physical AC, they produce distinct UUIDs and HomeKit doesn't collide.
+  All three together mean the two plugins can run **alongside each other** on the same Homebridge with full auto-discovery, no interference.
 - The `upstream` git remote was **deliberately removed** (since v0.2.0). The fork is intentionally divergent; the upstream's release cadence (last release ~2 years ago) doesn't justify the round-trip. If you need to fetch upstream history for reference, run `git remote add upstream https://github.com/nitaybz/homebridge-esphome-ac.git` ad-hoc, fetch, then remove again.
 - `package.json` `repository.url` MUST exactly match the GitHub repo URL (`https://github.com/nookied/homebridge-SLWF-01Pro.git`). npm sigstore provenance is strict — a mismatch causes `npm publish` to fail with HTTP 422 (warmup4ie hit this once).
 - CI runs lint + tests + smoke on Node 18/20/22/24 for every push (`.github/workflows/ci.yml`). Releases are tag-driven: `npm version patch|minor|major && git push --follow-tags` triggers `release.yml`, which publishes to npm with provenance and creates a GitHub Release.

@@ -2,6 +2,7 @@ const ESPHome = require('./lib/esphome');
 
 const PLUGIN_NAME = 'homebridge-slwf-01pro';
 const PLATFORM_NAME = 'SLWFOnePro';
+const ACCESSORY_SCHEMA_VERSION = 2;
 
 class ESPHomeAC {
 	constructor(log, config, api) {
@@ -9,9 +10,11 @@ class ESPHomeAC {
 		this.log = log;
 
 		this.accessories = [];
+		this.staleAccessories = [];
 		this.esphomeDevices = {};
 		this.PLUGIN_NAME = PLUGIN_NAME;
 		this.PLATFORM_NAME = PLATFORM_NAME;
+		this.ACCESSORY_SCHEMA_VERSION = ACCESSORY_SCHEMA_VERSION;
 		this.name = config.name || PLATFORM_NAME;
 		this.devices = config.devices || [];
 		this.debug = config.debug || false;
@@ -40,6 +43,12 @@ class ESPHomeAC {
 	}
 
 	configureAccessory(accessory) {
+		const cachedVersion = accessory.context && accessory.context.schemaVersion;
+		if (cachedVersion !== ACCESSORY_SCHEMA_VERSION) {
+			this.log.warn(`Cached accessory "${accessory.displayName}" is from an older plugin schema (v${cachedVersion || 1}); will be re-registered with the current schema (v${ACCESSORY_SCHEMA_VERSION}).`);
+			this.staleAccessories.push(accessory);
+			return;
+		}
 		this.log.easyDebug(`Found cached accessory: ${accessory.displayName} (${accessory.context.deviceId || 'no id'})`);
 		this.accessories.push(accessory);
 	}

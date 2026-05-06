@@ -7,6 +7,51 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [0.3.0] — 2026-05-06
+
+Final piece of the "fully independent plugin" story: HomeKit UUIDs are now namespaced so this plugin can run **alongside** upstream `homebridge-esphome-ac` (or any other plugin that hashes from the same ESPHome `unique_id`) on the same Homebridge bridge without UUID collisions.
+
+### ⚠️ Breaking — accessories will re-pair
+
+The UUID input is now `homebridge-slwf-01pro:<deviceId>` instead of bare `<deviceId>`. The same device gets a new UUID under this plugin → Apple Home treats it as a new accessory. **You'll lose room assignments, scenes, and automations** wired to the old accessory tiles. They need to be re-set up in Apple Home after the upgrade.
+
+The plugin **automatically evicts** old-schema cached accessories on startup (no manual cleanup required) and registers fresh ones with the new UUIDs.
+
+### Why
+
+Before 0.3.0, both upstream and this fork derived HomeKit UUIDs from `entity.config.uniqueId` (or its fallback). For a user with both plugins running in the **same** Homebridge bridge (not child-bridged) and both auto-discovering the same physical AC:
+
+- Upstream registers UUID `abc-123` for "Air Conditioner"
+- Our fork tries to register UUID `abc-123` too
+- HomeKit rejects the second one (UUID collision within a bridge)
+
+Child bridges (which the user is using) insulate against this — each child bridge is its own HomeKit instance — so the bug is theoretical for child-bridge users. But for users who run plugins on the main Homebridge bridge, the fix is mandatory. And it costs nothing to apply universally.
+
+After 0.3.0, the two plugins produce **deterministically different UUIDs** for the same device. Both can be installed on the same Homebridge with full auto-discovery enabled and no interaction.
+
+### Added
+
+- **`accessory.context.schemaVersion`** — stamped on every accessory created or restored. Currently `2` (1 was the unstamped pre-0.3.0 schema). Future schema breakages bump this number.
+- **`evictStaleSchemaAccessories(platform)`** in `lib/esphome.js` — runs first thing in `init()`. Walks `platform.staleAccessories` (populated by `configureAccessory` for entries with the wrong schema version) and unregisters them in one batch via `api.unregisterPlatformAccessories`. Clean cache transition with no manual user action.
+- **`UUID_NAMESPACE = 'homebridge-slwf-01pro'`** constant in `lib/DeviceAccessory.js`. Prefixed onto the device id before hashing.
+
+### Changed
+
+- **HomeKit UUID input format**: `homebridge-slwf-01pro:<deviceId>` (was bare `<deviceId>`). For devices with `unique_id` set in YAML, the old UUID was the same as upstream's; now ours is distinct. For devices without `unique_id` (the SLWF-01Pro/Midea default), the old UUID was already MAC-based via `deriveDeviceId` (added in 0.1.2); the prefix makes it distinct from upstream regardless.
+- **`configureAccessory` in `index.js`** now diverts schema-mismatched cached entries to `this.staleAccessories` and emits a warning. The init flow evicts them before doing anything else.
+
+### Migration
+
+For anyone on `homebridge-slwf-01pro@0.2.x` or earlier:
+1. `sudo npm install -g homebridge-slwf-01pro@latest`
+2. Restart Homebridge.
+3. The log shows `Evicting N cached accessor… from an older plugin schema. They will be re-registered fresh with stable UUIDs.` Old accessories disappear from Apple Home; new ones appear with the same names but no automations attached.
+4. Re-add the new accessories to your Apple Home rooms / scenes / automations.
+
+For anyone migrating from upstream: same as 0.2.0 (config.json edit `"ESPHomeAC"` → `"SLWFOnePro"`), plus the same UUID-driven re-pairing.
+
+---
+
 ## [0.2.0] — 2026-05-06
 
 Clean separation from upstream `homebridge-esphome-ac`. Breaking config change (one-line edit) but eliminates all namespace collision risk.
