@@ -7,7 +7,7 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
-## [Unreleased]
+## [0.4.4] — 2026-05-06
 
 ### Fixed
 
