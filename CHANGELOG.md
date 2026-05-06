@@ -7,6 +7,25 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [0.1.2] — 2026-05-06
+
+Critical bug fix surfaced by the first real-hardware test of 0.1.0/0.1.1.
+
+### Fixed
+
+- **All accessories failed to initialize** with `The "data" argument must be of type string or an instance of Buffer, TypedArray, or DataView. Received undefined`. Root cause: `lib/DeviceAccessory.js` derived its accessory UUID from `climate.config.uniqueId`, but ESPHome doesn't auto-populate `unique_id` on the `midea_ac` climate component when the YAML doesn't set it explicitly — `config.uniqueId` came through as `undefined`, and `api.hap.uuid.generate(undefined)` threw the cryptic Buffer error. The plugin now uses a fallback chain: `uniqueId` → `<macAddress>-<objectId>` → `<macAddress>-climate` → `<host>-<objectId>` → `<host>-climate` → `esphome-climate-<key>`. For users with `unique_id` set in YAML, the UUID is unchanged (no re-pairing). For users without it (the 0.1.0 failure mode), the UUID becomes stable per-device via the MAC address.
+- Reproduction: 6 SLWF-01Pro dongles flashed with stock ESPHome `midea_ac` YAML (no manual `unique_id`), all six failed identically. Verified fixed against the same setup.
+
+### Added
+
+- `deriveDeviceId(...)` pure helper in `lib/state.js` — fully unit-tested (9 new test cases covering each branch of the fallback chain).
+
+### Internal
+
+- 87 unit tests now pass (up from 78).
+
+---
+
 ## [0.1.1] — 2026-05-06
 
 Workflow-only patch.

@@ -12,6 +12,7 @@ const {
 	pickAutoMode,
 	supportsCool,
 	supportsHeat,
+	deriveDeviceId,
 } = require('../../lib/state');
 
 describe('deriveCurrentHeaterCoolerState', () => {
@@ -126,6 +127,72 @@ describe('pickAutoMode', () => {
 	});
 	test('null list → null', () => {
 		expect(pickAutoMode(null)).toBe(null);
+	});
+});
+
+describe('deriveDeviceId', () => {
+	test('uniqueId set → uniqueId (preferred for back-compat)', () => {
+		expect(deriveDeviceId({
+			climateConfig: { uniqueId: 'air-conditioner-fae810-climate', objectId: 'air_conditioner', key: 1234 },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			deviceHost: 'air-conditioner-fae810.local',
+		})).toBe('air-conditioner-fae810-climate');
+	});
+	test('uniqueId empty → falls back to mac+objectId', () => {
+		expect(deriveDeviceId({
+			climateConfig: { uniqueId: '', objectId: 'air_conditioner', key: 1234 },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			deviceHost: 'air-conditioner-fae810.local',
+		})).toBe('24:D7:EB:FA:E8:10-air_conditioner');
+	});
+	test('uniqueId undefined → falls back to mac+objectId', () => {
+		expect(deriveDeviceId({
+			climateConfig: { objectId: 'air_conditioner', key: 1234 },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			deviceHost: 'air-conditioner-fae810.local',
+		})).toBe('24:D7:EB:FA:E8:10-air_conditioner');
+	});
+	test('no uniqueId, no objectId, mac present → mac+climate', () => {
+		expect(deriveDeviceId({
+			climateConfig: { key: 1234 },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			deviceHost: 'air-conditioner-fae810.local',
+		})).toBe('24:D7:EB:FA:E8:10-climate');
+	});
+	test('no uniqueId, no mac, host+objectId → host+objectId', () => {
+		expect(deriveDeviceId({
+			climateConfig: { objectId: 'air_conditioner', key: 1234 },
+			deviceInfo: {},
+			deviceHost: '192.168.1.10',
+		})).toBe('192.168.1.10-air_conditioner');
+	});
+	test('only host present → host+climate', () => {
+		expect(deriveDeviceId({
+			climateConfig: { key: 1234 },
+			deviceInfo: {},
+			deviceHost: '192.168.1.10',
+		})).toBe('192.168.1.10-climate');
+	});
+	test('only key present → esphome-climate-<key>', () => {
+		expect(deriveDeviceId({
+			climateConfig: { key: 1234 },
+			deviceInfo: {},
+			deviceHost: '',
+		})).toBe('esphome-climate-1234');
+	});
+	test('nothing present → null', () => {
+		expect(deriveDeviceId({
+			climateConfig: {},
+			deviceInfo: {},
+			deviceHost: '',
+		})).toBe(null);
+	});
+	test('null inputs → null', () => {
+		expect(deriveDeviceId({
+			climateConfig: null,
+			deviceInfo: null,
+			deviceHost: null,
+		})).toBe(null);
 	});
 });
 
