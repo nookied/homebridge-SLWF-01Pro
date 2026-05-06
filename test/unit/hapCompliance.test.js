@@ -208,27 +208,8 @@ function makeFakeClimateEntity({ supportedModes = [0, 2, 3, 6], supportedFanMode
 	};
 }
 
-function buildAccessory(overrides = {}) {
-	const platform = makeFakePlatform();
-	const climate = makeFakeClimateEntity(overrides.climate);
-	const entities = { climate, ...(overrides.entities || {}) };
-	const device = {
-		name: 'Living Room AC',
-		host: '192.168.1.10',
-		...(overrides.device || {}),
-	};
-	const deviceInfo = { manufacturer: 'SMLIGHT', model: 'SLWF-01Pro', macAddress: '24:D7:EB:FA:E8:10', esphomeVersion: '2024.7.3', ...(overrides.deviceInfo || {}) };
-	const accessory = new DeviceAccessory({ device, deviceInfo, entities, platform });
-	// Stub registerPlatformAccessories — DeviceAccessory uses platform.api.registerPlatformAccessories
-	return { platform, accessory };
-}
-
-// Some platforms call api.registerPlatformAccessories — stub it so it doesn't crash
-beforeAll(() => {
-	// Patch makeFakePlatform's api on every call
-	const original = makeFakePlatform;
-	// nothing extra needed — DeviceAccessory uses this.api which we provide
-});
+// `buildAccessory` and a `beforeAll` stub were here in earlier drafts; tests inline
+// the construction so they can assert different things per case. Removed for clarity.
 
 // --- Tests ---------------------------------------------------------------
 
