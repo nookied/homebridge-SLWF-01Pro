@@ -16,11 +16,19 @@ Everything else is incremental coverage of ESPHome features (custom fan modes, p
 
 ---
 
-## Where we are today (Unreleased — slated for 0.1.0)
+## Where we are today (0.4.3 published)
 
-✅ Dynamic platform, per-device debouncing, mode-mapping refactor with HEAT_COOL handling, **mDNS auto-discovery**, **multi-entity bundling** (Climate + sensors + switches + buttons → one HomeKit accessory), **HumiditySensor + outdoor TemperatureSensor + Eve.Energy power + Beeper switch + Display switch + DRY/FAN_ONLY mode tiles**, all with per-device disable flags. `StatusActive`/`StatusFault` mirror connection state. **78 unit tests passing.** README + CLAUDE + CHANGELOG + ROADMAP + QA_TESTS + config.schema all updated.
+✅ **Shipped on npm as `homebridge-slwf-01pro@0.4.3` with provenance.** Tag-driven release pipeline via GitHub Actions. CI runs lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x. **130 unit tests passing** across 6 suites (state, classifyEntity, discovery, configSchema, configSchemaValidation, hapCompliance).
 
-⚠️ Custom fan modes / presets / two-point temperature not yet exposed. Encrypted ESPHome devices skip auto-discovery (mDNS doesn't broadcast the Noise key).
+✅ Dynamic platform, per-device debouncing, mode-mapping refactor with HEAT_COOL handling. **mDNS auto-discovery.** **Multi-entity bundling** (Climate + sensors + switches + buttons → one HomeKit accessory) with `HumiditySensor`, outdoor `TemperatureSensor`, Eve.Energy power, Beeper switch, Display switch, DRY/FAN_ONLY mode tiles, all with per-device disable flags. `StatusActive`/`StatusFault` mirror connection state.
+
+✅ **HAP best practices** through 0.4.3: `Categories.AIR_CONDITIONER`, `setPrimaryService(true)`, `addLinkedService` for companion services, `ConfiguredName` on every service, no-op `Identify` handler, `setProps` NaN-safety, `RotationSpeed.minStep` sized to fan-mode count, mode-fallthrough uses `validValues[0]` instead of hardcoded AUTO, `FirmwareRevision` SemVer-sanitized, `ACCESSORY_SCHEMA_VERSION = 4` evicts older cached accessories on upgrade.
+
+✅ **Three layers of independence from upstream `homebridge-esphome-ac`**: distinct npm name (`homebridge-slwf-01pro`), distinct platform identifier (`SLWFOnePro`), distinct UUID namespace (`homebridge-slwf-01pro:<deviceId>`). Both plugins can run side-by-side on the same Homebridge.
+
+🔴 **Active issue, blocks release of new features**: see [HANDOFF.md](HANDOFF.md). Apple Home pairing of the SLWF child bridge intermittently fails ("Connecting…" hangs OR "non-compliant" / accessories invisible) despite the plugin being HAP-best-practice clean. Hypotheses (untested): too many secondary services per accessory (8) for Apple Home iOS 17+; OR the Eve.Energy `CurrentPowerConsumption` custom characteristic on a standard `HeaterCooler` service.
+
+⚠️ Pending feature gaps: custom fan modes (`silent`/`turbo`), presets (`eco`/`boost`/`sleep`/`away`), two-point target temperature. Encrypted ESPHome devices skip auto-discovery (mDNS doesn't broadcast the Noise key).
 
 ---
 
@@ -42,7 +50,7 @@ Source: [`homebridge/verified`](https://github.com/homebridge/verified). 11 requ
 | 10 | Files stored under HB storage dir | ✅ | No disk files |
 | 11 | Catches and logs own errors, no unhandled exceptions | ✅ | Fork pass added `HapStatusError` rejections + try/catch around `climateCommandService` |
 
-**Two outstanding blockers for verification:** the npm-rename + GitHub release flow (M1) and the test suite (M2). Application is queued as Milestone 5.
+**All 11 requirements met as of 0.4.3.** Verification application is queued behind the active pairing issue (see HANDOFF.md). Once that's resolved and the plugin has been stable in real-world use for ~2 weeks with at least one external user, file via the `homebridge/verified` issue template.
 
 ---
 
@@ -50,9 +58,9 @@ Source: [`homebridge/verified`](https://github.com/homebridge/verified). 11 requ
 
 Versioning policy below is pre-1.0; once stable, switch to strict [SemVer](https://semver.org/).
 
-### 🟡 Milestone 1 — v0.1.0 — Fork bug-fix + multi-feature pass — IN PROGRESS
+### ✅ Milestone 1 — v0.1.x — Fork bug-fix + multi-feature pass — SHIPPED (0.1.0–0.1.2)
 
-**Goal:** ship everything currently in `Unreleased` after manual QA on a real Homebridge host.
+**Goal:** ship the full feature set: bug fixes, mode mapping, multi-entity bundling, all the optional services.
 
 | Item | Description | Status |
 |---|---|---|
@@ -77,33 +85,53 @@ Versioning policy below is pre-1.0; once stable, switch to strict [SemVer](https
 | `engines` raised | Node 18.20.4+ / Homebridge ^1.8.0 || ^2.0.0 | ✅ Done |
 | `displayName` | "Homebridge SLWF-01Pro / ESPHome AC" | ✅ Done |
 | Docs (README + CLAUDE + CHANGELOG + ROADMAP + QA_TESTS + config.schema) | Warmup-style structure | ✅ Done |
-| Manual QA on real hardware | Walk `QA_TESTS.md` end-to-end | ⏳ User-side |
-| Tag `v0.1.0` and create GitHub Release | After QA passes | ⏳ User-side |
-| **npm package renamed** to `homebridge-slwf-01pro` | Renamed from upstream's `homebridge-esphome-ac`; platform identifier (`"ESPHomeAC"`) preserved for migration compat | ✅ Done |
-| **CI workflow** (`.github/workflows/ci.yml`) | Lint + tests + smoke on Node 18.20 / 20.15 / 22 / 24, every push + PR | ✅ Done |
-| **Release workflow** (`.github/workflows/release.yml`) | Tag-driven (`v*`) `npm publish --provenance` + GitHub Release; verifies tag matches `package.json` version | ✅ Done |
-
-**Total effort remaining:** real-hardware QA + npm-token setup + first publish via tag.
+| **UUID derivation** | Fallback chain when ESPHome doesn't set `unique_id` | ✅ Done in 0.1.2 |
+| **npm publish + GitHub Release** | Tag-driven via `release.yml`; provenance attestation | ✅ Done |
 
 ---
 
-### ⏭️ Milestone 2 — v0.2.0 — Integration tests + Verified application prep
+### ✅ Milestone 2 — v0.2.x → v0.4.x — Independence + HAP correctness — SHIPPED
 
-**Goal:** widen the regression net beyond pure helpers. CI + release workflows + npm rename all shipped in 0.1.0.
+**Goal:** make the plugin fully independent of upstream + bring HAP integration up to current best practices.
+
+| Item | Description | Status |
+|---|---|---|
+| **Platform identifier rename** | `ESPHomeAC` → `SLWFOnePro` so two plugins can coexist | ✅ 0.2.0 |
+| **Upstream-orphan detection** | `detectOrphanedAccessories()` reads cache file, warns about leftover entries | ✅ 0.2.0 |
+| **Decoupled git remote** | `git remote remove upstream` | ✅ 0.2.0 |
+| **UUID namespace prefix** | `homebridge-slwf-01pro:<id>` so the same physical AC gets distinct UUIDs across plugins | ✅ 0.3.0 |
+| **Schema-versioned cached accessories** | `accessory.context.schemaVersion` + auto-eviction on bump | ✅ 0.3.0 |
+| **"Out of compliance" hardening** | Wait for first `state` event, safe defaults, `safeUpdate` helper, `FirmwareRevision` SemVer-sanitization, `setPrimaryService` | ✅ 0.3.1 |
+| **Config schema modernization** | Canonical JSON Schema with `required: [...]` arrays, `minLength: 1` on required strings; ajv test suite | ✅ 0.3.2/0.3.3 |
+| **Branding cleanup** | "ESPHome AC" / "ESPHomeAC" → "SLWF-01Pro" in user-visible strings | ✅ 0.4.0 |
+| **`Categories.AIR_CONDITIONER`** on accessory creation | Default was `OTHER`; could cause Apple Home iOS 16+ to hide accessories | ✅ 0.4.1 |
+| **`addLinkedService`** for companion services | Apple Home groups them in the accessory's UI panel | ✅ 0.4.1 |
+| **HAP audit fixes** | `setProps NaN`-safety, mode-fallthrough uses `validValues[0]`, `ConfiguredName`, `Identify` handler, `RotationSpeed.minStep`, constants single-sourced | ✅ 0.4.3 |
+| **HAP-compliance test suite** | Mock HAP shim asserting all of the above | ✅ 0.4.3 (10 tests) |
+
+**Total tests:** 130 across 6 suites. All shipped on npm with provenance.
+
+---
+
+### 🔴 Milestone 3 — v0.5.0 — Resolve the active pairing issue
+
+**Goal:** unblock real-world use. The plugin code is HAP-best-practice clean as far as our audit could see, yet pairing the bridge in Apple Home intermittently fails (see [HANDOFF.md](HANDOFF.md)).
+
+**Untested hypotheses, in order of leverage:**
 
 | Item | Description | Effort |
 |---|---|---|
-| Integration tests for `DeviceAccessory` | Fake `platform.api` HAP shim + entity stubs; assert services attached when entities present + removed when disable flags set | 2 h |
-| Integration tests for `stateManager` | Fake `that` + spy on `climateCommandService`; assert per-device debounce + clean-payload `markDirty` flow | 2 h |
-| Integration tests for `esphome.js` orchestrator | Fake `Client` + `discovery`; assert prune-on-empty + prune-when-discovery-fails behaviour | 2 h |
-| `clientInfo` to ESPHome | Pass `clientInfo: 'homebridge-slwf-01pro/<version>'` to `new Client(...)` so device-side logs identify the plugin | 15 min |
-| Encrypted-discovery actionable error | Detect noise-auth errors during reconnect loop and surface a one-shot user-actionable message ("device requires `encryptionKey`") | 1 h |
+| **Bare-bones config test** | User-side: set every `disable*` flag to `true` and try to pair. Confirms whether the issue is service count vs. plugin-shape. | 5 min user time |
+| **Eve.Energy on dedicated `Service.Outlet`** | Move `CurrentPowerConsumption` off the standard `HeaterCooler` service. Requires `addLinkedService` + a new subtype. | 2 h |
+| **Default companion services to disabled** | Switch from opt-out to opt-in for `disableBeeperSwitch` / `disableDisplaySwitch` / `disableDryMode` / `disableFanOnlyMode` so a fresh install pairs cleanly with minimal services, then user enables what they want. Breaking config-shape change → bumps minor. | 1 h |
+| **Bridge HAP state reset documentation** | Surface the `AccessoryInfo.<bridgeId>.json` + `IdentifierCache.<bridgeId>.json` reset path in the troubleshooting section of README. | 30 min |
+| **`clientInfo` to ESPHome** | Pass `clientInfo: 'homebridge-slwf-01pro/<version>'` so device-side logs identify the plugin. | 15 min |
 
-**Total effort:** ~7 hours. **No HomeKit-visible changes.** Ships as `0.2.0`.
+**Total estimate:** 4 hours of code + iterations on user feedback. Ships as `0.5.0` (or `0.4.4` if no breaking config change is needed).
 
 ---
 
-### ⏭️ Milestone 3 — v0.3.0 — Custom fan modes + presets
+### ⏭️ Milestone 4 — Custom fan modes + presets
 
 **Goal:** finish ESPHome capability coverage. DRY/FAN_ONLY shipped early in 0.1.0; what remains is custom fan modes and presets.
 
@@ -119,7 +147,7 @@ Versioning policy below is pre-1.0; once stable, switch to strict [SemVer](https
 
 ---
 
-### ⏭️ Milestone 4 — v0.4.0 — Two-point target temperature
+### ⏭️ Milestone 5 — Two-point target temperature
 
 **Goal:** when the device advertises `supportsTwoPointTargetTemperature`, use it.
 
@@ -136,7 +164,7 @@ The current code treats `HeatingThresholdTemperature` and `CoolingThresholdTempe
 
 ---
 
-### ⏭️ Milestone 5 — v1.0.0 — Verified Plugin application
+### ⏭️ Milestone 6 — v1.0.0 — Verified Plugin application
 
 **Goal:** apply for [Homebridge Verified](https://github.com/homebridge/verified) once the plugin has been stable in real-world use for several weeks.
 

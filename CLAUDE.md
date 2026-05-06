@@ -11,10 +11,12 @@ This file is the canonical persistent memory for this project. Any assistant/age
 **Type:** Homebridge plugin (Node.js, CommonJS)
 **Purpose:** Expose ESPHome climate entities — primarily the **[SMLIGHT SLWF-01Pro](https://smartlight.me/smart-home-devices/wifi-devices/wifi-dongle-air-conditioners-midea-idea-electrolux-for-home-assistant)** Wi-Fi dongle flashed with ESPHome — as HomeKit `HeaterCooler` accessories. Hardware-agnostic: any ESPHome `climate:` component (e.g. ESP32 with [`midea_ac`](https://esphome.io/components/climate/midea.html) directly soldered) is also picked up.
 **Repo:** [`https://github.com/nookied/homebridge-SLWF-01Pro`](https://github.com/nookied/homebridge-SLWF-01Pro) — **maintained fork**
-**Original (upstream):** [`nitaybz/homebridge-esphome-ac`](https://github.com/nitaybz/homebridge-esphome-ac) — last release 0.0.4, low maintenance velocity. Kept as a git remote (`upstream`) for occasional cherry-picks.
+**Original (upstream):** [`nitaybz/homebridge-esphome-ac`](https://github.com/nitaybz/homebridge-esphome-ac) — last release 0.0.4. The `upstream` git remote was deliberately removed in v0.2.0; the fork is fully independent.
 **License:** MIT (preserved from original)
-**Current version:** **0.0.4** (inherited; first fork release will bump to **0.1.0**, see ROADMAP)
+**Current version:** **0.4.3** — published on npm with provenance. 130 unit tests passing. CI on Node 18.20.4 / 20.15.1 / 22.x / 24.x. Tag-driven release pipeline.
 **Engines:** Homebridge `^1.8.0 || ^2.0.0`; Node `^18.20.4 || ^20.15.1 || ^22.0.0 || ^24.0.0`
+
+> **⚠️ Open issue at the time of this writing — see [HANDOFF.md](HANDOFF.md):** Apple Home pairing of the SLWF child bridge intermittently fails ("Connecting…" hangs OR "non-compliant" / accessories invisible). Plugin code is HAP-best-practice clean (130 tests verify); leading hypothesis is service count per accessory exceeding Apple Home iOS 17+ tolerance, OR the Eve.Energy custom characteristic on a standard service. Test path: bare-bones config (all `disable*` flags `true`) before re-enabling services one at a time.
 
 ### What "SLWF-01Pro" is
 
@@ -111,17 +113,29 @@ homebridge-SLWF-01Pro/
 │   │   ├── fanModeToSpeed(fanMode, list)           Discrete fan mode → 0–100%
 │   │   └── chooseInitialTargetMode(stateMode)      Initial cached state for new accessories
 │   │
-│   └── eve.js                            Eve.app custom characteristic factory
-│       ├── makeEveClasses(api)                 Returns { CurrentPowerConsumption, TotalConsumption } classes,
-│       │                                          with Formats/Perms fallback for HAP-NodeJS 2.x
-│       ├── EVE_POWER_UUID                      'E863F10D-...'
-│       └── EVE_TOTAL_CONSUMPTION_UUID           'E863F10C-...'
+│   ├── eve.js                            Eve.app custom characteristic factory
+│   │   ├── makeEveClasses(api)                 Returns { CurrentPowerConsumption } class with HAP-NodeJS 2.x fallbacks
+│   │   └── EVE_POWER_UUID                      'E863F10D-...'
+│   │
+│   └── constants.js                      Single source of truth for plugin-wide constants
+│       ├── PLUGIN_NAME / PLATFORM_NAME         npm + Homebridge identifiers
+│       ├── ACCESSORY_SCHEMA_VERSION            Bumped on accessory-shape changes (currently 4)
+│       └── UUID_NAMESPACE                      Prefix for the HomeKit UUID hash
 │
 ├── test/
 │   └── unit/
-│       ├── state.test.js                 Truth tables for all mappers + capability checks (52 tests)
+│       ├── state.test.js                 Truth tables for all mappers + capability checks + deriveDeviceId (61 tests)
 │       ├── classifyEntity.test.js        Entity classification + bundling (17 tests)
-│       └── discovery.test.js             prettyNameFromHostname + dedupeDevices (9 tests)
+│       ├── discovery.test.js             prettyNameFromHostname + dedupeDevices (9 tests)
+│       ├── configSchema.test.js          Structural schema audit + drift checks vs. lib/constants.js (13 tests)
+│       ├── configSchemaValidation.test.js  ajv-based config-schema validation (20 tests)
+│       └── hapCompliance.test.js         Mock HAP shim: AccessoryCategory, setPrimaryService, addLinkedService,
+│                                            ConfiguredName, Identify handler, NaN-safe setProps,
+│                                            RotationSpeed.minStep, schema-version single-sourcing (10 tests)
+│
+├── .github/workflows/
+│   ├── ci.yml                            Lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x, every push + PR
+│   └── release.yml                       Tag-driven (`v*`); npm publish --provenance + GitHub Release with notes from CHANGELOG
 │
 ├── package.json                          scripts: lint / lint:fix / test / test:all
 ├── config.schema.json                    Homebridge UI form-based config editor (autoDiscover + per-device disable flags)
@@ -129,8 +143,9 @@ homebridge-SLWF-01Pro/
 ├── README.md                             User docs
 ├── CHANGELOG.md                          Keep-a-Changelog format
 ├── ROADMAP.md                            Development plan
-├── QA_TESTS.md                           Manual pre-release checklist
+├── QA_TESTS.md                           Manual pre-release checklist + pairing-issue diagnostic flow
 ├── CLAUDE.md                             This file — project memory
+├── HANDOFF.md                            Active-issue brief (open pairing problem) for whoever picks up next
 ├── AGENTS.md                             Pointer → CLAUDE.md
 ├── LICENSE                               MIT
 └── .eslintrc.json                        ESLint legacy-config (eslint:recommended; tabs; jest env)
@@ -278,14 +293,17 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 
 ## Known issues / tech debt
 
-### Open
-1. **Custom fan modes (`silent`, `turbo`) and presets (`eco`, `boost`, `sleep`, `away`) are not exposed.** Midea-platform devices commonly advertise these via `supportedCustomFanModesList`/`supportedPresetsList`. Roadmap M3.
-2. **Two-point target temperature is not used.** Even when `config.supportsTwoPointTargetTemperature === true`, the plugin sends only single `target_temperature`. AUTO mode in HomeKit uses both `HeatingThresholdTemperature` and `CoolingThresholdTemperature` — currently both write to the same single field. Roadmap M4.
-3. **Intake-mounted sensor inaccuracy.** Device-side issue (the SLWF-01Pro reads cold-air-blast not room temp). Mitigated by ESPHome's `midea_ac.follow_me` action — Home-Assistant-only and needs a hardware mod. Out of scope for this plugin.
-4. **Encrypted ESPHome devices skip auto-discovery.** mDNS doesn't broadcast the Noise encryption key, so encrypted devices need a manual `devices[]` entry. Documented in README.
-5. **Heuristic entity classification.** Beeper/humidity/etc. are matched by name pattern. If a user customizes their ESPHome YAML to use unusual entity names, the entity won't be classified. Could add explicit `entityMap` config option later.
+### Open — immediate priority
+1. **🔴 Apple Home pairing intermittently fails** — see [HANDOFF.md](HANDOFF.md). User reports either (a) "Connecting…" spinner that hangs indefinitely, or (b) bridge pairs but is "non-compliant" / accessories invisible. The plugin code is HAP-best-practice-clean as of 0.4.3 (130 tests verify category, primary service, linked services, ConfiguredName, Identify handler, NaN-safe setProps). Leading hypotheses: too many secondary services per accessory (8) for Apple Home iOS 17+; OR Eve.Energy `CurrentPowerConsumption` custom characteristic on the standard `HeaterCooler` service. Untested: bare-bones config with all `disable*` flags `true` to rule out service-count; refactor of Eve.Energy to a dedicated `Service.Outlet`.
 
-### Resolved (in fork v0.1.0, unreleased)
+### Open — feature gaps
+2. **Custom fan modes (`silent`, `turbo`) and presets (`eco`, `boost`, `sleep`, `away`) are not exposed.** Midea-platform devices commonly advertise these via `supportedCustomFanModesList`/`supportedPresetsList`. Roadmap M4.
+3. **Two-point target temperature is not used.** Even when `config.supportsTwoPointTargetTemperature === true`, the plugin sends only single `target_temperature`. AUTO mode in HomeKit uses both `HeatingThresholdTemperature` and `CoolingThresholdTemperature` — currently both write to the same single field. Roadmap M5.
+4. **Intake-mounted sensor inaccuracy.** Device-side issue (the SLWF-01Pro reads cold-air-blast not room temp). Mitigated by ESPHome's `midea_ac.follow_me` action — Home-Assistant-only and needs a hardware mod. Out of scope for this plugin.
+5. **Encrypted ESPHome devices skip auto-discovery.** mDNS doesn't broadcast the Noise encryption key, so encrypted devices need a manual `devices[]` entry. Documented in README.
+6. **Heuristic entity classification.** Beeper/humidity/etc. are matched by name pattern. If a user customizes their ESPHome YAML to use unusual entity names, the entity won't be classified. Could add explicit `entityMap` config option later.
+
+### Resolved across 0.1.0 → 0.4.3
 - **Module-level `sendTimeout` shared across devices.** Multi-AC users could lose commands when changing one AC then another within 600 ms. Now a per-device `that._sendTimeout`.
 - **Undefined `log` ReferenceError on disconnect.** `stateManager.js` referenced bare `log` in the device-disconnected error path; would crash the call instead of returning a clean HAP error. Fixed to `that.log.error` and rejection now uses `HapStatusError`.
 - **Stacked `connected`/`disconnected` listeners.** Original code attached them inside the `entity.once('state')` callback — every Climate entity (and every reconnect) added another pair. Moved to platform scope, attached once per Client.
@@ -293,6 +311,13 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 - **`registerPlatform` missing dynamic flag.** `registerPlatform(name, alias, Class)` registered as a static platform; should be `registerPlatform(name, alias, Class, true)`. Cached accessories were being unregistered every restart.
 - **`package.json` `repository.url` pointed to upstream.** Would break sigstore provenance on `npm publish`. Now points at the fork.
 - **HeaterCooler.js mutated `state.targetTemperature` for clamping.** Plugin-side clamp leaked into the live state object; means the next outgoing command could carry the clamped value even if the device had a different target. Replaced with `clampTargetTemperature(value)` that returns a new value without mutating.
+- **All accessories failed to construct on devices without `unique_id` set in YAML** *(0.1.0/0.1.1 → 0.1.2)*. `api.hap.uuid.generate(undefined)` threw the cryptic `data argument must be a Buffer/string/...` error. `deriveDeviceId(...)` fallback chain in `lib/state.js` now handles it: `uniqueId → mac+objectId → mac+climate → host+...`.
+- **Platform identifier rename `ESPHomeAC` → `SLWFOnePro`** *(0.2.0)*. Eliminates namespace collision with upstream when both plugins are installed. `lib/esphome.js` `detectOrphanedAccessories()` warns about cached entries from upstream OR from the legacy identifier.
+- **Same physical AC produced colliding HomeKit UUIDs** if both plugins discovered it *(0.3.0)*. UUIDs are now derived from `homebridge-slwf-01pro:<deviceId>` so the two plugins can run side-by-side. `accessory.context.schemaVersion` evicts cached accessories from earlier UUID schemes.
+- **"Out of compliance" pairing error for devices that hadn't sent state yet** *(0.3.1)*. Three layers: wait for first `state` event before construction (5 s timeout fallback); safe defaults for `CurrentTemperature`/threshold characteristics; `safeUpdate()` skips updates of `null`/`undefined`/`NaN`. `FirmwareRevision` validated against HAP's SemVer-ish format.
+- **Config UI "validation failed" warning** *(0.3.2/0.3.3)*. `config.schema.json` modernized to canonical JSON Schema (`required: [...]` arrays at parent level, no per-property `required: false`). ajv-based test suite with 20 sample configs.
+- **`Categories.AIR_CONDITIONER` was never set on accessories** *(0.4.1)*. Defaulting to `OTHER (1)` could cause Apple Home iOS 16+ to silently hide accessories. Companion services (sensors + switches) are now `addLinkedService`-linked to the primary HeaterCooler.
+- **HAP-compliance audit fixes** *(0.4.3)*. `setProps NaN`-guard with default visual temp bounds; mode-fallthrough uses `validValues[0]` instead of hardcoded AUTO; `ConfiguredName` on every companion service; `Identify` handler bound; `RotationSpeed.minStep` sized to fan-mode count; `ACCESSORY_SCHEMA_VERSION` consolidated to `lib/constants.js` (single source). Mock-HAP-shim test suite (`test/unit/hapCompliance.test.js`, 9 tests) prevents regression.
 
 ### By design (won't fix)
 - **No upstream PR-back.** The fork is intentionally divergent and the upstream's release cadence (last release ~2 years ago) doesn't justify the round-trip.
@@ -338,6 +363,9 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 | `lib/stateManager.js` | HomeKit `.onSet` handlers + per-device debounced send (clean-payload builder) |
 | `lib/state.js` | Pure ESPHome ↔ HomeKit mode/fan/swing mappers |
 | `lib/eve.js` | Eve.Energy `CurrentPowerConsumption` custom characteristic factory |
+| `lib/constants.js` | Single source of truth: `PLUGIN_NAME`, `PLATFORM_NAME`, `ACCESSORY_SCHEMA_VERSION`, `UUID_NAMESPACE` |
+| `.github/workflows/ci.yml` | Lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x |
+| `.github/workflows/release.yml` | Tag-driven npm publish + GitHub Release |
 | `package.json` | Package metadata, scripts, deps |
 | `config.schema.json` | Homebridge UI form-based config editor |
 | `config-sample.json` | Reference config with one device entry |
@@ -345,6 +373,7 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 | `README.md` | User-facing docs |
 | `CHANGELOG.md` | Release history (Keep a Changelog) |
 | `ROADMAP.md` | Development plan (M1–M5) |
+| `HANDOFF.md` | Active-issue brief for the next coding instance (open pairing problem) |
 | `test/unit/*.test.js` | Jest unit tests (78 currently) |
 | `QA_TESTS.md` | Manual pre-release checklist |
 | `AGENTS.md` | Pointer to this file |

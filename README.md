@@ -227,6 +227,38 @@ These are device-side issues, not plugin bugs — listed here so you know what t
 
 ## Troubleshooting
 
+### Apple Home "Connecting..." spinner hangs / "Out of compliance" / accessories invisible after pairing
+
+There's a known intermittent pairing issue under active investigation — see [HANDOFF.md](HANDOFF.md) for the full state of play.
+
+**First-line workaround**: try pairing with all optional services disabled:
+
+```jsonc
+{
+  "platforms": [
+    {
+      "platform": "SLWFOnePro",
+      "name": "SLWF-01Pro",
+      "autoDiscover": true,
+      "disableHumiditySensor": true,
+      "disableOutdoorTempSensor": true,
+      "disablePowerSensor": true,
+      "disableBeeperSwitch": true,
+      "disableDisplaySwitch": true,
+      "disableDryMode": true,
+      "disableFanOnlyMode": true
+    }
+  ]
+}
+```
+
+This reduces each AC to just the climate service (heat/cool/fan/swing). Pair the bridge with this config first; once the bridge is paired in Apple Home, re-enable the optional services one at a time, restarting between each.
+
+If pairing still hangs even with this minimal config, the issue is at a different layer — see the **Pairing diagnostic flow** in [QA_TESTS.md §7](QA_TESTS.md). Most likely:
+- Bridge HAP pairing state is stale → reset by deleting `AccessoryInfo.<bridgeId>.json` and `IdentifierCache.<bridgeId>.json` under your Homebridge `persist/` directory, then restart.
+- iCloud HomeKit data is corrupt → on iPhone: Settings → Home → toggle iCloud HomeKit off/on, restart device.
+- Bridge port not reachable from iPhone → check firewall (`ufw status`, macOS Application Firewall, Docker port mapping).
+
 ### Plugin starts but the AC tile in HomeKit is "Not Responding"
 Check that the SLWF-01Pro is reachable from the Homebridge host (`ping <host>` and `nc -vz <host> 6053`). The plugin connects on `didFinishLaunching` and reconnects every 5 s if the device drops; if you see no `<name> client connected` line followed by `Initialized "<name>" with N mapped entit(y|ies)` in the log within a minute, ESPHome isn't accepting the connection. Common causes: wrong `encryptionKey`, firewall, ESPHome `api:` block missing.
 

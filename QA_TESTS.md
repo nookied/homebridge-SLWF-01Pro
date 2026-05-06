@@ -121,7 +121,59 @@ These are bugs that broke previous versions. Verify they stay fixed:
 - [ ] **Rapid taps**: tap Off → Heat → Off → Heat in rapid succession (< 2 sec); each call should succeed or fail gracefully (no double-callback / no orphaned state).
 - [ ] **Encrypted ESPHome API**: if your device uses `api: encryption: key:`, set `encryptionKey` in config and verify everything still works.
 
-## 7. Rollback test (do once per minor version, not per patch)
+## 7. Pairing diagnostic flow (use when "Connecting…" hangs or "non-compliant" appears)
+
+This flow narrows down whether a pairing failure is plugin-side, network-side, or Apple-Home-side. Run in order; stop at the first step that resolves.
+
+### 7a. Confirm the bridge process is alive
+
+- [ ] Homebridge UI status bar — SLWF child bridge is **running** (green dot)
+- [ ] `sudo hb-service logs --tail 30` — look for the `Setup Payload: X-HM://...` block; the `is running on port XXXXX` line tells you the HAP port
+- [ ] `sudo ss -tlnp | grep <bridge-port>` — port should show `LISTEN`. If absent, the child bridge crashed; restart it.
+
+### 7b. Confirm the bridge is reachable from the iPhone's network
+
+- [ ] From a Mac on the same Wi-Fi: `nc -zv <homebridge-host-ip> <bridge-port>` — should succeed within 1 second.
+  - If hangs/times out: firewall / network issue. Check `ufw status`, `pf` rules, Docker port mapping, VLAN segmentation.
+  - If succeeds: pairing TCP path works; issue is pairing-state or HAP-shape, not network.
+
+### 7c. Check the live log during a pair attempt
+
+- [ ] Tail the log: `sudo hb-service logs -f | grep -iE "SLWF|HAP|pair|connect|error"`
+- [ ] In Apple Home, attempt to add the bridge.
+  - If the log shows `[HAP] Pair Setup ...` lines: the bridge is processing the request. Look for any error (HAP version, characteristic validation, etc.). If pairing completes log-side but iOS still says "Connecting…", iOS-side cache is stale (see 7e).
+  - If the log is **silent** during "Connecting…": packets aren't reaching the bridge. Network issue (back to 7b).
+
+### 7d. Bare-bones config test
+
+This isolates plugin-shape vs. service-count issues.
+
+- [ ] Edit `config.json` to set ALL `disable*` flags to `true` at the platform level.
+- [ ] Wipe the bridge's HAP state + cache (so it pairs fresh):
+  ```bash
+  sudo hb-service stop
+  sudo rm /var/lib/homebridge/persist/AccessoryInfo.<bridgeId>.json
+  sudo rm /var/lib/homebridge/persist/IdentifierCache.<bridgeId>.json
+  sudo rm /var/lib/homebridge/accessories/cachedAccessories.<bridgeId>
+  sudo hb-service start
+  ```
+- [ ] Try to pair the bridge in Apple Home with the new PIN from the log.
+  - **If pairs cleanly**: each AC now has just `AccessoryInformation + HeaterCooler`. Re-enable `disable*` flags one at a time (restart between each), verify each step still pairs. The first one that breaks is the culprit.
+  - **If still fails**: not a service-count issue. Continue to 7e.
+
+### 7e. Reset HomeKit on the iPhone (nuclear)
+
+- [ ] iOS Settings → [your name] → iCloud → toggle HomeKit data off → confirm → toggle back on.
+- [ ] Or: Settings → Home → tap home → tap iPhone → Reset HomeKit Configuration.
+- [ ] Restart iPhone.
+- [ ] Try pairing again.
+
+### 7f. Try a different iOS device
+
+- [ ] Pair from a different iPhone or iPad on the same network.
+- [ ] If it works on the other device: iOS-side cache on the first device is corrupt. The iCloud reset should fix; if not, factory-reset HomeKit on the first device.
+
+## 8. Rollback test (do once per minor version, not per patch)
 
 - [ ] Verify rollback to the previous version works (`sudo npm install -g github:nookied/homebridge-SLWF-01Pro#<previous-sha>`)
 - [ ] After rollback, confirm previous version's behaviour returns
