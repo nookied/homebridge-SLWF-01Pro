@@ -2,79 +2,214 @@
   "pluginAlias": "ESPHomeAC",
   "pluginType": "platform",
   "singular": true,
-  "headerDisplay": "Homebridge plugin for ESPHome AC Controller",
-  "footerDisplay": "Created by @nitaybz",
+  "headerDisplay": "Homebridge plugin for ESPHome AC controllers (SLWF-01Pro Wi-Fi dongle and other ESPHome `Climate` entities). Supports auto-discovery, humidity / outdoor-temperature / power sensors, beeper / display switches, and DRY / FAN_ONLY mode tiles.",
+  "footerDisplay": "Original by @nitaybz; SLWF-01Pro fork by @nookied.",
   "schema": {
-      "type": "object",
-      "properties": {
-          "name": {
-              "title": "Plugin Name (for logs)",
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Plugin Name (for logs)",
+        "type": "string",
+        "default": "ESPHomeAC",
+        "required": false
+      },
+      "debug": {
+        "title": "Enable Debug Logs",
+        "description": "Surface ESPHome state-change chatter to the main log (otherwise sent to log.debug).",
+        "type": "boolean",
+        "default": false,
+        "required": false
+      },
+      "autoDiscover": {
+        "title": "Auto-discover ESPHome devices via mDNS",
+        "description": "Browses _esphomelib._tcp on the local network and adds any ESPHome devices with a Climate entity. Only works for unencrypted ESPHome API. Manually configured devices in the list below take precedence and are required for encrypted devices.",
+        "type": "boolean",
+        "default": false,
+        "required": false
+      },
+      "discoveryTimeout": {
+        "title": "Discovery timeout (seconds)",
+        "type": "integer",
+        "default": 5,
+        "minimum": 2,
+        "maximum": 30,
+        "required": false,
+        "condition": { "functionBody": "return model.autoDiscover === true;" }
+      },
+      "disableHumiditySensor": {
+        "title": "Hide Humidity sensor service (for ACs without a real humidity probe)",
+        "type": "boolean",
+        "default": false,
+        "required": false
+      },
+      "disableOutdoorTempSensor": {
+        "title": "Hide Outdoor Temperature sensor service",
+        "type": "boolean",
+        "default": false,
+        "required": false
+      },
+      "disablePowerSensor": {
+        "title": "Hide Power Usage characteristic (Eve.Energy)",
+        "type": "boolean",
+        "default": false,
+        "required": false
+      },
+      "disableBeeperSwitch": {
+        "title": "Hide Beeper switch",
+        "type": "boolean",
+        "default": false,
+        "required": false
+      },
+      "disableDisplaySwitch": {
+        "title": "Hide Display Toggle switch",
+        "type": "boolean",
+        "default": false,
+        "required": false
+      },
+      "disableDryMode": {
+        "title": "Hide DRY mode switch",
+        "type": "boolean",
+        "default": false,
+        "required": false
+      },
+      "disableFanOnlyMode": {
+        "title": "Hide FAN_ONLY mode switch",
+        "type": "boolean",
+        "default": false,
+        "required": false
+      },
+      "devices": {
+        "type": "array",
+        "required": false,
+        "items": {
+          "title": "Devices",
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Display name in HomeKit",
               "type": "string",
-              "default": "ESPHomeAC",
+              "required": true
+            },
+            "host": {
+              "title": "Hostname or IP address",
+              "type": "string",
+              "required": true
+            },
+            "port": {
+              "title": "ESPHome native API port",
+              "type": "integer",
+              "default": 6053,
+              "minimum": 1,
+              "maximum": 65535,
               "required": false
-          },
-          "debug": {
-              "title": "Enable Debug Logs",
-              "description": "When checked, the plugin will produce extra logs for debugging purposes",
+            },
+            "encryptionKey": {
+              "title": "ESPHome API Noise encryption key (base64)",
+              "type": "string",
+              "required": false
+            },
+            "disableHumiditySensor": {
+              "title": "Hide Humidity sensor for this device",
               "type": "boolean",
               "default": false,
               "required": false
-          },
-          "devices": {
-              "type": "array",
-              "required": true,
-              "items": {
-                "title": "Devices",
-                "type": "object",
-                "properties": {
-                  "name": {
-                      "title": "Name of the Device in HomeKit",
-                      "type": "string",
-                      "required": true
-                  },
-                  "host": {
-                      "title": "Device Hostname or IP",
-                      "type": "string",
-                      "required": true
-                  },
-                  "port": {
-                      "title": "API Port",
-                      "type": "number",
-                      "default": 6053,
-                      "required": false
-                  },
-                  "encryptionKey": {
-                      "title": "API Encryption Key (if available)",
-                      "type": "string",
-                      "required": false
-                  }
-
-                }
-              }
+            },
+            "disableOutdoorTempSensor": {
+              "title": "Hide Outdoor Temperature for this device",
+              "type": "boolean",
+              "default": false,
+              "required": false
+            },
+            "disablePowerSensor": {
+              "title": "Hide Power Usage for this device",
+              "type": "boolean",
+              "default": false,
+              "required": false
+            },
+            "disableBeeperSwitch": {
+              "title": "Hide Beeper switch for this device",
+              "type": "boolean",
+              "default": false,
+              "required": false
+            },
+            "disableDisplaySwitch": {
+              "title": "Hide Display Toggle for this device",
+              "type": "boolean",
+              "default": false,
+              "required": false
+            },
+            "disableDryMode": {
+              "title": "Hide DRY mode switch for this device",
+              "type": "boolean",
+              "default": false,
+              "required": false
+            },
+            "disableFanOnlyMode": {
+              "title": "Hide FAN_ONLY mode switch for this device",
+              "type": "boolean",
+              "default": false,
+              "required": false
+            }
           }
+        }
       }
+    }
   },
-    "layout": [
-      {
-        "key": "name"
-      },
-      {
-        "key": "debug"
-      },
-      {
-        "key": "devices",
-        "type": "array",
-        "title": "Custom Devices Settings",
-        "orderable": false,
-        "buttonText": "Add Device",
-        "expandable": true,
-        "expanded": false,
-        "items": [
-          "devices[].name",
-          "devices[].host",
-          "devices[].port",
-          "devices[].encryptionKey"
+  "layout": [
+    { "key": "name" },
+    { "key": "debug" },
+    {
+      "type": "fieldset",
+      "title": "Auto-discovery",
+      "expandable": true,
+      "expanded": true,
+      "items": ["autoDiscover", "discoveryTimeout"]
+    },
+    {
+      "type": "fieldset",
+      "title": "Global service toggles (apply to all devices)",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        "disableHumiditySensor",
+        "disableOutdoorTempSensor",
+        "disablePowerSensor",
+        "disableBeeperSwitch",
+        "disableDisplaySwitch",
+        "disableDryMode",
+        "disableFanOnlyMode"
+      ]
+    },
+    {
+      "key": "devices",
+      "type": "array",
+      "title": "Manual device list",
+      "description": "Optional. Required for encrypted ESPHome devices. Per-device toggles override the globals.",
+      "orderable": false,
+      "buttonText": "Add Device",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        "devices[].name",
+        "devices[].host",
+        "devices[].port",
+        "devices[].encryptionKey",
+        {
+          "type": "fieldset",
+          "title": "Per-device service toggles",
+          "expandable": true,
+          "expanded": false,
+          "items": [
+            "devices[].disableHumiditySensor",
+            "devices[].disableOutdoorTempSensor",
+            "devices[].disablePowerSensor",
+            "devices[].disableBeeperSwitch",
+            "devices[].disableDisplaySwitch",
+            "devices[].disableDryMode",
+            "devices[].disableFanOnlyMode"
           ]
-      }
-    ]
-} 
+        }
+      ]
+    }
+  ]
+}

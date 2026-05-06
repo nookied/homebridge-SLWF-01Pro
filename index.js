@@ -1,43 +1,50 @@
-const ESPHome = require('./lib/esphome')
-const PLUGIN_NAME = 'homebridge-esphome-ac'
-const PLATFORM_NAME = 'ESPHomeAC'
-module.exports = (api) => {
-	api.registerPlatform(PLUGIN_NAME, PLATFORM_NAME, ESPHomeAC)
-}
+const ESPHome = require('./lib/esphome');
+
+const PLUGIN_NAME = 'homebridge-esphome-ac';
+const PLATFORM_NAME = 'ESPHomeAC';
 
 class ESPHomeAC {
-
 	constructor(log, config, api) {
-		this.api = api
-		this.log = log
+		this.api = api;
+		this.log = log;
 
-		this.accessories = []
-		this.esphomeDevices = {}
-		this.PLUGIN_NAME = PLUGIN_NAME
-		this.PLATFORM_NAME = PLATFORM_NAME
-		this.name = config.name || PLATFORM_NAME
-		this.devices = config.devices || []
-		this.debug = config.debug || false
+		this.accessories = [];
+		this.esphomeDevices = {};
+		this.PLUGIN_NAME = PLUGIN_NAME;
+		this.PLATFORM_NAME = PLATFORM_NAME;
+		this.name = config.name || PLATFORM_NAME;
+		this.devices = config.devices || [];
+		this.debug = config.debug || false;
+		this.autoDiscover = config.autoDiscover || false;
+		this.discoveryTimeout = config.discoveryTimeout || undefined;
 
-		
-		// define debug method to output debug logs when enabled in the config
+		this.disableHumiditySensor = config.disableHumiditySensor || false;
+		this.disableOutdoorTempSensor = config.disableOutdoorTempSensor || false;
+		this.disableBeeperSwitch = config.disableBeeperSwitch || false;
+		this.disableDisplaySwitch = config.disableDisplaySwitch || false;
+		this.disableDryMode = config.disableDryMode || false;
+		this.disableFanOnlyMode = config.disableFanOnlyMode || false;
+		this.disablePowerSensor = config.disablePowerSensor || false;
+
 		this.log.easyDebug = (...content) => {
-			if (this.debug) {
-				this.log(content.reduce((previous, current) => {
-					return previous + ' ' + current
-				}))
-			} else
-				this.log.debug(content.reduce((previous, current) => {
-					return previous + ' ' + current
-				}))
-		}
+			const message = content.map(part => (typeof part === 'string' ? part : JSON.stringify(part))).join(' ');
+			if (this.debug) this.log(message);
+			else this.log.debug(message);
+		};
 
-		this.api.on('didFinishLaunching', ESPHome.init.bind(this))
-
+		this.api.on('didFinishLaunching', () => {
+			Promise.resolve(ESPHome.init.call(this)).catch(err => {
+				this.log.error(`Plugin initialization failed: ${err.message || err}`);
+			});
+		});
 	}
 
 	configureAccessory(accessory) {
-		this.log.easyDebug(`Found Cached Accessory: ${accessory.displayName} (${accessory.context.deviceId}) `)
-		this.accessories.push(accessory)
+		this.log.easyDebug(`Found cached accessory: ${accessory.displayName} (${accessory.context.deviceId || 'no id'})`);
+		this.accessories.push(accessory);
 	}
 }
+
+module.exports = (api) => {
+	api.registerPlatform(PLUGIN_NAME, PLATFORM_NAME, ESPHomeAC, true);
+};

@@ -1,33 +1,265 @@
-# homebridge-esphome-ac
+# homebridge-SLWF-01Pro
 
-[![Downloads](https://img.shields.io/npm/dt/homebridge-esphome-ac.svg?color=critical)](https://www.npmjs.com/package/homebridge-esphome-ac)
-[![Version](https://img.shields.io/npm/v/homebridge-esphome-ac)](https://www.npmjs.com/package/homebridge-esphome-ac)
+[Homebridge](https://homebridge.io) plugin for the **[SLWF-01Pro Wi-Fi dongle](https://smartlight.me/smart-home-devices/wifi-devices/wifi-dongle-air-conditioners-midea-idea-electrolux-for-home-assistant)** flashed with ESPHome — exposes the AC it's plugged into as a HomeKit `HeaterCooler` accessory with full mode, fan-speed and swing control.
 
-[Homebridge](https://homebridge.io) plugin for ESPHome AC Accessories.
+The SLWF-01Pro is a Wi-Fi dongle from **[SMLIGHT](https://smartlight.me)** (Ukraine) that drops into the proprietary serial Wi-Fi port on Midea-protocol air conditioners — replacing the OEM Tuya/SmartLife stick. Hardware revisions in the wild: **v1.1**, **v1.2** (ESP8266) and **v2.1** (ESP32); pinouts differ between revisions. Once flashed with [ESPHome](https://esphome.io) (typically the [`midea_ac`](https://esphome.io/components/climate/midea.html) component) the dongle exposes the AC as a `Climate` entity over the ESPHome native API — this plugin bridges that entity into HomeKit.
 
-## Why this plugin?
+This is a **maintained fork** of [`homebridge-esphome-ac`](https://github.com/nitaybz/homebridge-esphome-ac) by nitaybz, focused on the SLWF-01Pro use case: bug fixes, cleanup, and longer-term polish around multi-device reliability.
 
-I created this plugin because I did not like the Home Assistant integration for Air Conditioner in HomeKit. this plugin give better control over AC accessory with fan speed and oscilate directly from the accessory settings instead of adding another fan accessory.
+## Why this fork exists
 
-It also better shows the state of Cooling/Heating and allow to turn ON/OFF by one tap from the home screen instead of going into the accessory settings..
+The upstream plugin works for single-device setups but has a few sharp edges that bite multi-AC households (the typical SLWF-01Pro buyer often has multiple Midea/Electrolux units). The fork addresses correctness *and* expands HomeKit coverage:
 
-## Installation
+- **HEAT_COOL devices got no AUTO button.** Many SLWF-01Pro / Midea ACs advertise mode `HEAT_COOL` (1) instead of `AUTO` (6). The original plugin only checked for mode 6 → HomeKit AUTO didn't appear. The fork picks whichever mode the device supports.
+- **Wire-format payload was leaky.** The original sent the *entire* climate-state object with every command, including stale `target_temperature_low/high = 0`. On HEAT_COOL devices this overwrites the heat/cool band on every interaction. The fork builds a clean payload of only the fields you actually changed.
+- **Multi-device command coalescing.** A module-level send timeout meant changing one AC could cancel a pending command on another. Each AC now owns its own debouncer.
+- **Crash on disconnected device.** The upstream `device disconnected` error path referenced an undefined `log` symbol → `ReferenceError` instead of a clean HomeKit error. Fixed.
+- **Auto-discovery via mDNS** — listed `_esphomelib._tcp` services are picked up automatically; you don't need to type six IP addresses for six ACs.
+- **Multi-entity bundling** — humidity, outdoor temperature, power consumption, beeper, display toggle, DRY, and FAN_ONLY all show up in HomeKit when the device exposes them.
 
-You can configure each of the esphome devices directly from the Homebridge UI or view the attached config-sample.json to see how to configure with the config.json file
+See [CHANGELOG.md](CHANGELOG.md) for the full restoration story.
 
-The plugin will automatically collect your configurations from ESPHome and will allow those to be controlled from HomeKit
+## Supported devices
 
-* DRY and FAN modes currently not supported.
+Anything that publishes a `Climate` entity over the ESPHome native API will work. The intended target is the SLWF-01Pro itself, but the plugin is hardware-agnostic — any ESPHome `climate:` component (e.g. an ESP32 with [`midea_ac`](https://esphome.io/components/climate/midea.html) directly soldered) will be picked up.
 
+| AC brand families known to work with SLWF-01Pro | Notes |
+|---|---|
+| **Midea**, Idea, Electrolux, Bosch, Beko, Neoclima | Manufacturer's primary tested set; all Midea-protocol mini-splits |
+| Senville (Leto), Yitahome, Mr. Cool, AUX | Other Midea-platform rebadges |
+| Alpine, Pioneer, Samsung, Toshiba, Zanussi | ~30 brands total — see [smartlight.me](https://smartlight.me/smart-home-devices/wifi-devices/wifi-dongle-air-conditioners-midea-idea-electrolux-for-home-assistant) for the full list |
+| Newer 2024+ AC firmwares with proprietary protocols | May not work — check the manufacturer's compatibility notes before buying |
 
--------------------------------------------
+DRY and FAN_ONLY ESPHome modes are surfaced as **companion `Switch` services** ("AC Dry", "AC Fan Only") next to the main `HeaterCooler` tile. Toggling one ON puts the AC into that mode; toggling OFF restores the previous primary mode (HEAT/COOL/AUTO). Hide via `disableDryMode` / `disableFanOnlyMode`.
 
-## Support homebridge-esphome-ac
+ESPHome's **custom fan modes** (`silent`, `turbo` on Midea) and **presets** (`eco`, `boost`, `sleep`, `away`) are not yet surfaced — the plugin only handles the standard fan-modes list. See [ROADMAP.md](ROADMAP.md).
 
-**homebridge-esphome-ac** is a free plugin under the MIT license. it was developed as a contribution to the homebridge/hoobs community with lots of love and thoughts.
-Creating and maintaining Homebridge plugins consume a lot of time and effort and if you would like to share your appreciation, feel free to "Star" or donate. 
+## Install
 
-<a target="blank" href="https://www.paypal.me/nitaybz"><img src="https://img.shields.io/badge/PayPal-Donate-blue.svg?logo=paypal"/></a><br>
-<a target="blank" href="https://www.patreon.com/nitaybz"><img src="https://img.shields.io/badge/PATREON-Become a patron-red.svg?logo=patreon"/></a><br>
-<a target="blank" href="https://ko-fi.com/nitaybz"><img src="https://img.shields.io/badge/Ko--Fi-Buy%20me%20a%20coffee-29abe0.svg?logo=ko-fi"/></a>
+```bash
+sudo npm install -g homebridge-esphome-ac
+```
 
+Or from the Homebridge UI: search for **homebridge-esphome-ac** in the plugin browser. *(Package will be republished under a fork-specific npm name once the rewrite stabilises — see [ROADMAP.md](ROADMAP.md).)*
+
+To install straight from git instead of npm (e.g. to pin a specific commit):
+
+```bash
+sudo npm install -g github:nookied/homebridge-SLWF-01Pro#<sha>
+```
+
+## Configuration
+
+The simplest config — auto-discover everything on the local network:
+
+```jsonc
+{
+  "platforms": [
+    {
+      "platform": "ESPHomeAC",
+      "name": "ESPHomeAC",
+      "autoDiscover": true
+    }
+  ]
+}
+```
+
+Or fully manual (required for encrypted devices and any device not on the same broadcast domain):
+
+```jsonc
+{
+  "platforms": [
+    {
+      "platform": "ESPHomeAC",
+      "name": "ESPHomeAC",
+      "debug": false,
+      "devices": [
+        {
+          "name": "Living Room AC",
+          "host": "192.168.1.120",
+          "port": 6053,
+          "encryptionKey": "",
+          "disableHumiditySensor": true
+        }
+      ]
+    }
+  ]
+}
+```
+
+You can mix both — listed devices in `devices[]` take precedence; auto-discovered devices are added on top.
+
+### Platform-level keys
+
+| Key | Required | Default | Notes |
+|---|---|---|---|
+| `platform` | yes | — | Must be exactly `"ESPHomeAC"` (the platform identifier — same as the upstream plugin so existing configs migrate without edits) |
+| `name` | no | `ESPHomeAC` | Display name in Homebridge logs |
+| `debug` | no | `false` | Surface ESPHome state-change chatter to the main log instead of `log.debug` |
+| `autoDiscover` | no | `false` | mDNS-browse for ESPHome devices on the local network and create accessories automatically. Encrypted devices still need a manual `devices[]` entry — the Noise key is not broadcast. |
+| `discoveryTimeout` | no | `5` | Seconds to wait for mDNS responses before continuing. |
+| `disableHumiditySensor` | no | `false` | Hide the HumiditySensor service for **every** device (e.g. ACs that report a fake `0 %` because no probe is fitted). |
+| `disableOutdoorTempSensor` | no | `false` | Hide the outdoor TemperatureSensor service. |
+| `disablePowerSensor` | no | `false` | Hide the Eve.Energy CurrentPowerConsumption characteristic. |
+| `disableBeeperSwitch` | no | `false` | Hide the Beeper Switch service. |
+| `disableDisplaySwitch` | no | `false` | Hide the Display Toggle Switch service. |
+| `disableDryMode` | no | `false` | Hide the DRY mode Switch service. |
+| `disableFanOnlyMode` | no | `false` | Hide the FAN_ONLY mode Switch service. |
+| `devices` | no | `[]` | Manual list of ESPHome devices. Required for encrypted devices; optional otherwise if `autoDiscover: true`. |
+
+### Per-device keys (under `devices[]`)
+
+| Key | Required | Default | Notes |
+|---|---|---|---|
+| `name` | yes | — | Display name in HomeKit |
+| `host` | yes | — | IP address or hostname of the SLWF-01Pro / ESPHome device |
+| `port` | no | `6053` | ESPHome native API port |
+| `encryptionKey` | no | `""` | Base64 ESPHome `api: encryption` key, if set in the device's YAML |
+| `disableHumiditySensor` | no | `false` | Per-device override; if true, hides the HumiditySensor for **this** device only. |
+| `disableOutdoorTempSensor` | no | `false` | Per-device override |
+| `disablePowerSensor` | no | `false` | Per-device override |
+| `disableBeeperSwitch` | no | `false` | Per-device override |
+| `disableDisplaySwitch` | no | `false` | Per-device override |
+| `disableDryMode` | no | `false` | Per-device override |
+| `disableFanOnlyMode` | no | `false` | Per-device override |
+
+Per-device disable flags **override** the platform-wide flag (logical OR — `device[key] || platform[key]`). The platform-wide flag turns the service off for every device; the per-device flag turns it off for just that one. There's no way to enable a service that's globally disabled.
+
+The plugin auto-discovers the climate entity's capabilities (supported modes, fan modes, swing modes, visual min/max temperatures, target step) directly from ESPHome — no model-specific config required.
+
+`config.schema.json` provides a form-based editor in the Homebridge UI.
+
+## Recommended: enable Child Bridge
+
+If you have **two or more** SLWF-01Pro dongles, run this plugin in a Homebridge **Child Bridge**. ESPHome devices on Wi-Fi can blip out for a few seconds during router restarts; isolating the plugin means a hung reconnect can't block your other accessories.
+
+In the Homebridge UI: **Plugins** tab → click the gear icon on the plugin → **Bridge Settings** → enable **Child Bridge**. Restart when prompted.
+
+## What ends up in HomeKit
+
+Per ESPHome device, all of these services land on a single HomeKit accessory if the device exposes the matching entity (and the corresponding `disable*` flag is `false`):
+
+| HomeKit service | Source ESPHome entity | Disable flag |
+|---|---|---|
+| `Service.HeaterCooler` (mandatory) | `Climate` entity | — |
+| `Service.HumiditySensor` | Sensor matching `*humidity*` | `disableHumiditySensor` |
+| `Service.TemperatureSensor` (outdoor) | Sensor matching `*outdoor*temp*` | `disableOutdoorTempSensor` |
+| Eve.Energy `CurrentPowerConsumption` (W) on the AC accessory | Sensor matching `*power*` | `disablePowerSensor` |
+| `Service.Switch` "Beeper" | Switch matching `*beeper*` | `disableBeeperSwitch` |
+| `Service.Switch` "Display" | Button matching `*display*` (auto-resets after press) | `disableDisplaySwitch` |
+| `Service.Switch` "Dry" | Climate device's `DRY` mode | `disableDryMode` |
+| `Service.Switch` "Fan Only" | Climate device's `FAN_ONLY` mode | `disableFanOnlyMode` |
+| `StatusActive` + `StatusFault` (on the climate service) | Mirrors ESPHome client connect/disconnect | — (always on) |
+
+Entities the plugin deliberately ignores: Wi-Fi RSSI, Uptime, Factory Reset (dangerous to expose).
+
+## Behaviour
+
+### Modes
+
+The HomeKit `HeaterCooler` accessory uses three modes; this plugin maps them as follows:
+
+| HomeKit | ESPHome `ClimateMode` | What happens |
+|---|---|---|
+| **Off** (Active=0) | `OFF` (0) | AC turns off; HomeKit remembers the previous mode for the next "On" tap |
+| **Heat** | `HEAT` (3) | AC switches to heating mode |
+| **Cool** | `COOL` (2) | AC switches to cooling mode |
+| **Auto** | `AUTO` (6) | AC switches to auto / heat-cool mode |
+
+The mode-list shown to HomeKit is filtered to the modes ESPHome actually advertises (`supportedModesList`), so a cooling-only AC won't show a Heat button.
+
+### Temperature
+
+HomeKit sends one of two temperature characteristics depending on mode: `CoolingThresholdTemperature` (in Cool / Auto) or `HeatingThresholdTemperature` (in Heat / Auto). Both currently set the same single `target_temperature` ESPHome field — the plugin doesn't yet use the device's two-point `target_temperature_low`/`target_temperature_high` even when supported. See [ROADMAP.md](ROADMAP.md).
+
+Slider drags are debounced — the plugin sends one ESPHome command 600 ms after you stop, not one per tick.
+
+### Fan speed
+
+HomeKit's `RotationSpeed` (0–100%) is split evenly across the device's `supportedFanModesList`. So if your AC supports `[LOW, MEDIUM, HIGH]`, 1–33% maps to LOW, 34–66% to MEDIUM, 67–100% to HIGH. The `AUTO` fan mode (if supported) is selected when you set rotation speed to 0.
+
+### Swing
+
+If the device advertises any swing mode beyond OFF, a HomeKit Swing toggle is exposed. The plugin chooses the most useful swing direction at startup (BOTH > VERTICAL > HORIZONTAL) and the toggle flips between that direction and OFF.
+
+## Migration
+
+If you're moving from the upstream `homebridge-esphome-ac`:
+
+```bash
+# No config changes needed — the platform identifier is the same
+sudo npm uninstall -g homebridge-esphome-ac
+sudo npm install -g github:nookied/homebridge-SLWF-01Pro
+sudo systemctl restart homebridge   # or: hb-service restart
+```
+
+**Your `config.json` does not need changes.** The platform identifier (`"platform": "ESPHomeAC"`) is unchanged for compatibility.
+
+## Known SLWF-01Pro quirks
+
+These are device-side issues, not plugin bugs — listed here so you know what to expect:
+
+- **Intake-mounted temperature sensor reads warm/cold air, not room temp.** HomeKit will show a value that's a few degrees off the actual room. Mitigation: ESPHome's [`midea_ac.follow_me`](https://esphome.io/components/climate/midea.html) action pushes an external Home Assistant sensor reading into the AC, but it's a Home-Assistant-only feature and (on some Senville/Midea units) requires a small hardware mod soldering IO13 to the display board's "Rec 1 OUT" pin.
+- **Pinout differs between v1.1, v1.2 and v2.1** of the dongle. Wrong YAML for your hardware revision means no UART communication. Check the SMLIGHT product page for the matching firmware before flashing.
+- **Outdoor temperature and humidity setpoint** are model-specific (e.g. Midea Mission II doesn't expose them); expect them to be missing on most installs.
+- **Newer Midea firmwares** with proprietary key exchange may refuse to talk to the dongle. SMLIGHT's compatibility list is the source of truth.
+
+## Troubleshooting
+
+### Plugin starts but the AC tile in HomeKit is "Not Responding"
+Check that the SLWF-01Pro is reachable from the Homebridge host (`ping <host>` and `nc -vz <host> 6053`). The plugin connects on `didFinishLaunching` and reconnects every 5 s if the device drops; if you see no `<name> client connected` line followed by `Initialized "<name>" with N mapped entit(y|ies)` in the log within a minute, ESPHome isn't accepting the connection. Common causes: wrong `encryptionKey`, firewall, ESPHome `api:` block missing.
+
+### "ESPHome device" appears but no temperature shown
+ESPHome may not have published the initial `state` event yet. Wait 30 s; if still empty, restart the SLWF-01Pro.
+
+### Multi-AC: changing one AC's setting cancels another's
+This was a real bug in upstream `homebridge-esphome-ac@0.0.4` (module-level send timeout, shared across all devices). Fixed in this fork's first release.
+
+### My AC has no humidity probe but HomeKit shows 0 %
+Set `disableHumiditySensor: true` (either platform-wide or just under that device's `devices[]` entry). The HumiditySensor service will be removed on the next restart.
+
+### Auto-discovery doesn't see one of my ACs
+Likely causes: (1) the device has `api: encryption: key:` set in its ESPHome YAML, in which case mDNS doesn't broadcast the Noise key — add it manually to `devices[]`. (2) The device is on a different VLAN/subnet that blocks mDNS. (3) ESPHome's `mdns:` block is disabled. Quickest fix: list it manually in `devices[]`.
+
+### HomeKit AUTO button missing on a device that supports auto mode
+Your device probably advertises `HEAT_COOL` (mode 1) instead of `AUTO` (mode 6). Both are now handled equivalently as of this fork's first release; if you're on upstream `homebridge-esphome-ac@0.0.4`, this was the bug.
+
+### Debug logs
+Set `"debug": true` in the platform config — every state change and outgoing command will surface in the main log.
+
+## Development
+
+```bash
+git clone https://github.com/nookied/homebridge-SLWF-01Pro.git
+cd homebridge-SLWF-01Pro
+npm install
+npm run lint                                  # ESLint
+npm test                                      # Jest — 78 unit tests
+node -e "require('./index.js')"               # smoke test (loads cleanly)
+```
+
+See [QA_TESTS.md](QA_TESTS.md) for the manual pre-release checklist and [ROADMAP.md](ROADMAP.md) for what's planned next.
+
+## Releasing
+
+After the pre-release checklist in [QA_TESTS.md](QA_TESTS.md) passes:
+
+```bash
+npm version 0.1.0                              # bumps package.json + creates v0.1.0 tag
+git push --follow-tags                         # pushes commit + tag
+npm pack --dry-run                             # sanity-check tarball contents
+gh release create v0.1.0 --notes-from-tag      # GitHub Release from tag message
+```
+
+`package.json` has a `files` array, so `npm publish` ships only `index.js`, `lib/`, `config.schema.json`, `config-sample.json`, `LICENSE`, `README.md`, `CHANGELOG.md`. Internal docs (`CLAUDE.md`, `ROADMAP.md`, `QA_TESTS.md`, `test/`) stay out of the published tarball.
+
+## License
+
+[MIT](LICENSE). Copyright 2020 Nitay Ben Zvi (original) + 2026 Karol Nowacki (this fork). The MIT license is preserved from the original.
+
+## Credits
+
+- **[nitaybz](https://github.com/nitaybz)** — original `homebridge-esphome-ac` plugin (2023), the basis for this fork.
+- **[smartlight.me](https://smartlight.me)** — designs and ships the SLWF-01Pro hardware + ESPHome firmware.
+- **[ESPHome](https://esphome.io)** — the firmware and native-API protocol the plugin speaks.
+- **[@2colors/esphome-native-api](https://github.com/2colors/esphome-native-api)** — Node.js client for the ESPHome native API.

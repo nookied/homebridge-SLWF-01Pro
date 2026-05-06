@@ -6,23 +6,26 @@
     "pin": "031-45-154"
   },
 
-  "description": "This is an advanced example configuration for the esphome-ac homebridge plugin",
+  "description": "Sample config for the homebridge-SLWF-01Pro fork. Pick auto-discovery OR manual devices, or both.",
   "platforms": [
     {
       "platform": "ESPHomeAC",
       "name": "ESPHomeAC",
       "debug": false,
+      "autoDiscover": true,
+      "discoveryTimeout": 5,
+      "disableHumiditySensor": false,
       "devices": [
         {
-          "name": "My AC",
+          "name": "Living Room AC",
           "host": "192.168.1.120",
           "port": 6053,
-          "encryptionKey": ""
+          "encryptionKey": "",
+          "disableHumiditySensor": true
         }
       ]
     }
   ],
 
-  "accessories": [
-  ]
+  "accessories": []
 }
