@@ -7,7 +7,9 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
-## [0.4.2] — 2026-05-06
+## [0.4.3] — 2026-05-06
+
+(Tag `v0.4.2` exists but was never published — its release workflow failed at the lint step on a leftover unused-import in the new test file. `0.4.3` is the same content + that lint fix.)
 
 Driven by an independent HAP-compliance audit triggered by the missing-AccessoryCategory bug. Six findings addressed with code changes plus a regression-prevention test suite specifically for the HAP integration surface.
 
@@ -41,7 +43,7 @@ Driven by an independent HAP-compliance audit triggered by the missing-Accessory
 
 ### Migration
 
-After upgrading to 0.4.2:
+After upgrading to 0.4.3:
 1. `sudo npm install -g homebridge-slwf-01pro@latest`
 2. `sudo hb-service restart`
 3. The log shows `Evicting N cached accessories from an older plugin schema` (schema bump from 3 → 4).
