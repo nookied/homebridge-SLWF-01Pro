@@ -8,19 +8,19 @@ The fork was taken at upstream 0.0.4 because the upstream's release cadence (las
 
 ## TL;DR — where we're aiming
 
-1. **Stable 0.5.x baseline.** The 0.4.x pairing concerns are resolved (user-confirmed paired); 0.5.x flipped defaults so a fresh install gives a clean Apple Home and per-device overrides became symmetric. Restart-resilience for Apple Home renames + offline auto-discovered devices landed in 0.5.1; empty Homebridge UI row filtering landed in 0.5.2.
+1. **Stable 0.5.x baseline.** The 0.4.x pairing concerns are resolved (user-confirmed paired); 0.5.x flipped defaults so a fresh install gives a clean Apple Home and per-device overrides became symmetric. Restart-resilience for Apple Home renames + offline auto-discovered devices landed in 0.5.1; empty Homebridge UI row filtering landed in 0.5.2; capability-aware restore mode, ConfiguredName seeding for newly-enabled cached companion services, current-temperature clamping, and a non-destructive prune guard for invalid hostless manual entries landed in 0.5.3.
 2. **Apply for Homebridge Verified** once 0.5.x has a few stable weeks in the wild. All requirements are already met (dynamic platform ✓, config.schema ✓, no telemetry ✓, errors caught ✓, tests ✓, tag-driven release ✓, npm name correct ✓).
 3. **Feature coverage** — custom fan modes (`silent`/`turbo`), presets (`eco`/`boost`/`sleep`/`away`), two-point target temperature. See M4/M5 below.
 
 ---
 
-## Where we are today (0.5.2 package, local review in progress)
+## Where we are today (0.5.3 published)
 
-✅ **Package version is `homebridge-slwf-01pro@0.5.2`.** Tag-driven release pipeline via GitHub Actions. CI runs lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x. **159 unit tests pass locally** across 8 suites (state, classifyEntity, discovery, configSchema, configSchemaValidation, hapCompliance, pruning, looksLikeRealEntry).
+✅ **Shipped on npm as `homebridge-slwf-01pro@0.5.3` with provenance.** Tag-driven release pipeline via GitHub Actions. CI runs lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x. **159 unit tests passing** across 8 suites (state, classifyEntity, discovery, configSchema, configSchemaValidation, hapCompliance, pruning, looksLikeRealEntry).
 
 ✅ Dynamic platform, per-device debouncing, mode-mapping refactor with HEAT_COOL handling. **mDNS auto-discovery on by default** (since 0.5.0). **Multi-entity bundling** (Climate + sensors + switches + buttons → one HomeKit accessory) with `HumiditySensor`, outdoor `TemperatureSensor`, hidden-Outlet Eve.Energy power, Beeper switch, Display switch, DRY/FAN_ONLY mode tiles, all hidden by default with bidirectional per-device override. `StatusActive`/`StatusFault` mirror connection state.
 
-✅ **HAP best practices** through local review: `Categories.AIR_CONDITIONER`, `setPrimaryService(true)`, `addLinkedService` for companion services, `ConfiguredName` seeded on first registration and for newly-added cached companion services (Apple-Home renames persist across restarts), no-op `Identify` handler, `setProps` NaN-safety, primary `CurrentTemperature` clamped to HAP-safe range, `RotationSpeed.minStep` sized to fan-mode count, mode-fallthrough uses `validValues[0]`, capability-aware Active restore mode, `FirmwareRevision` SemVer-sanitized, Eve `CurrentPowerConsumption` on a hidden linked Outlet (not on the standard `HeaterCooler` service), `ACCESSORY_SCHEMA_VERSION = 5` evicts older cached accessories on upgrade.
+✅ **HAP best practices** through 0.5.3: `Categories.AIR_CONDITIONER`, `setPrimaryService(true)`, `addLinkedService` for companion services (de-duped against existing links), `ConfiguredName` seeded on first registration and for newly-added cached companion services (Apple-Home renames persist across restarts), no-op `Identify` handler, `setProps` NaN-safety, primary `CurrentTemperature` clamped to HAP-safe range, `RotationSpeed.minStep` sized to fan-mode count, mode-fallthrough uses `validValues[0]`, capability-aware Active restore mode (heat-only devices never resume in COOL), unsupported HEAT/COOL writes ignored at the `set.TargetHeaterCoolerState` boundary, `FirmwareRevision` SemVer-sanitized, Eve `CurrentPowerConsumption` on a hidden linked Outlet (not on the standard `HeaterCooler` service), `ACCESSORY_SCHEMA_VERSION = 5` evicts older cached accessories on upgrade.
 
 ✅ **Restart-resilience** since 0.5.1: Apple Home renames stick across Homebridge restarts; auto-discovered devices that are offline at restart keep their HomeKit identity (name/room/automations) instead of being unregistered.
 
@@ -127,7 +127,8 @@ Versioning policy below is pre-1.0; once stable, switch to strict [SemVer](https
 | **ConfiguredName persistence** | Apple Home renames are not clobbered on restart. | ✅ 0.5.1 |
 | **Auto-discovered offline devices kept** | mDNS misses no longer remove cached accessories when `autoDiscover` is on. | ✅ 0.5.1 |
 | **Empty UI row filtering** | Homebridge UI form scaffolding rows no longer log noisy host warnings. | ✅ 0.5.2 |
-| **Invalid manual config prune guard** | Local review keeps cached accessories when a real manual entry is missing `host`. | ✅ unreleased |
+| **Invalid manual config prune guard** | Cached accessories are kept when a real manual entry is missing `host`. | ✅ 0.5.3 |
+| **Capability-aware restore mode + current-temp clamp** | Heat-only devices never resume in COOL on Active=ON; primary `CurrentTemperature` is clamped to the HAP-safe range. | ✅ 0.5.3 |
 
 **Historical diagnostics:** [HANDOFF.md](HANDOFF.md) remains as the archived pairing diagnostic flow.
 

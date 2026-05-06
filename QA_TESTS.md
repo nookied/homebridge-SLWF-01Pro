@@ -1,6 +1,6 @@
 # QA — Manual pre-release checklist
 
-Run this on the real Homebridge host before tagging a release. Jest covers the pure helpers and HAP shape (159 unit tests as of the local post-0.5.2 review); this checklist is the line of defence against regressions on real ESPHome hardware that the unit suite can't see.
+Run this on the real Homebridge host before tagging a release. Jest covers the pure helpers and HAP shape (159 unit tests as of 0.5.3); this checklist is the line of defence against regressions on real ESPHome hardware that the unit suite can't see.
 
 Budget: ~10 minutes per release.
 
@@ -13,7 +13,7 @@ Budget: ~10 minutes per release.
 - [ ] `CHANGELOG.md` has an entry for the new version with date
 - [ ] `package.json` `repository.url` matches the GitHub repo URL exactly (sigstore provenance is strict — see CHANGELOG)
 - [ ] `npm run lint` clean
-- [ ] `npm test` — all unit tests pass (159 as of the local post-0.5.2 review; bump this number alongside any test additions)
+- [ ] `npm test` — all unit tests pass (159 as of 0.5.3; bump this number alongside any test additions)
 - [ ] `node -e "require('./index.js')"` smoke test exits 0
 - [ ] Working git SHA noted for rollback: `_______________`
 
