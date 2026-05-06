@@ -7,6 +7,49 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [0.4.2] — 2026-05-06
+
+Driven by an independent HAP-compliance audit triggered by the missing-AccessoryCategory bug. Six findings addressed with code changes plus a regression-prevention test suite specifically for the HAP integration surface.
+
+### Fixed (high-priority HAP correctness)
+
+- **`setProps` could receive `NaN`** if an ESPHome firmware doesn't advertise `visualMinTemperature` / `visualMaxTemperature` / `visualTargetTemperatureStep`. The plugin tried `(undefined + undefined) / 2 = NaN` for `CurrentTemperature` initial value, and `setProps({ minValue: undefined, ... })` for the threshold characteristics. HAP-NodeJS rejects `NaN` and `setProps` validates finite numbers — accessory init would silently throw inside the `try/catch` in `esphome.js`, leaving the device invisible. New defaults: `visualMinTemperature = 16`, `visualMaxTemperature = 30`, `visualTargetTemperatureStep = 0.5` if any are missing.
+- **`updateClimateState` fallthrough wrote `TargetHeaterCoolerState.AUTO`** even when AUTO wasn't in the validValues array. If a device's state arrived with mode = `null` or an unrecognized value after creation, this hardcoded write violated `setProps({ validValues })` and HAP threw — silently breaking subsequent state pushes. Now reads `validValues` from the characteristic's props and uses the first valid entry as the fallback (or `AUTO` only if the array somehow comes back empty).
+
+### Fixed (UX / log hygiene)
+
+- **No `Identify` handler was bound on `AccessoryInformation`.** HAP-NodeJS 0.11+ logs `[HAP] Service ... has no Identify handler` at every accessory init. Apple Home's "Identify" button silently no-op'd. Now binds a logging handler so taps are visible in the log.
+- **Companion Switch + Sensor services had no `ConfiguredName`.** Apple Home iOS 16+ uses `ConfiguredName` (HAP R12) for the user-rename UI. Without it, users see Apple's auto-generated names like "Switch 1", "Switch 2" instead of "Beeper", "Display". Now set on every companion service (Beeper, Display, Dry, Fan Only, Humidity, Outdoor, plus the primary HeaterCooler) using HAP's `addOptionalCharacteristic` mechanism with a `testCharacteristic` guard.
+- **`Characteristic.Name` on `AccessoryInformation`** was relying on HAP-NodeJS's auto-seeding from displayName. Now set explicitly for defensive correctness.
+- **`RotationSpeed` had no `minStep`** so the fan slider snapped on each percentage. Now sets `minStep = floor(100 / fanModesCount)` so the slider lands cleanly on each discrete fan-mode position.
+
+### Internal
+
+- **`ACCESSORY_SCHEMA_VERSION` consolidated** into `lib/constants.js` as a single source of truth. Previously declared in both `index.js` and `lib/DeviceAccessory.js` — easy to forget to bump one of them. Now one constant, imported from both. Bumped to 4 to evict 0.4.1 cached accessories on first 0.4.2 launch (so users get the ConfiguredName + Identify-handler updates without manual cleanup).
+- **`PLUGIN_NAME` and `PLATFORM_NAME` also moved to `lib/constants.js`** (single source).
+- **`UUID_NAMESPACE` moved to `lib/constants.js`.**
+- **`test/unit/hapCompliance.test.js` (9 new tests, 130 total)** — exercises `DeviceAccessory` against a mock HAP shim. Asserts:
+  - `Categories.AIR_CONDITIONER` is set on `platformAccessory` creation
+  - `setPrimaryService(true)` is called on `HeaterCoolerService`
+  - `addLinkedService` is called for every companion service
+  - `ConfiguredName` is set on each Switch service
+  - `Identify` characteristic has an `onSet` handler
+  - `setProps` doesn't NaN out when ESPHome omits visual temp bounds
+  - `RotationSpeed.minStep` matches the count of supported fan modes
+  - `lib/constants.js` is the single source for the schema version
+  - `index.js` and `lib/DeviceAccessory.js` import from constants (no inline duplicate)
+
+### Migration
+
+After upgrading to 0.4.2:
+1. `sudo npm install -g homebridge-slwf-01pro@latest`
+2. `sudo hb-service restart`
+3. The log shows `Evicting N cached accessories from an older plugin schema` (schema bump from 3 → 4).
+4. Apple Home: force-quit and reopen on iPhone. ConfiguredName updates appear (Switch tiles now labeled "Beeper", "Display", "Dry", "Fan Only" instead of generic "Switch N").
+5. No re-pairing needed — the bridge identity is preserved.
+
+---
+
 ## [0.4.1] — 2026-05-06
 
 HAP-level fixes for "accessories visible in Homebridge but not in Apple Home" after a successful bridge pairing.

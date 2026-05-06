@@ -3,6 +3,7 @@ const path = require('path');
 
 const SCHEMA_PATH = path.join(__dirname, '..', '..', 'config.schema.json');
 const INDEX_PATH = path.join(__dirname, '..', '..', 'index.js');
+const CONSTANTS_PATH = path.join(__dirname, '..', '..', 'lib', 'constants.js');
 const DEVICE_ACCESSORY_PATH = path.join(__dirname, '..', '..', 'lib', 'DeviceAccessory.js');
 
 function loadSchema() {
@@ -30,12 +31,15 @@ describe('config.schema.json', () => {
 		expect(schema.schema).toBeDefined();
 	});
 
-	test('pluginAlias matches PLATFORM_NAME in index.js', () => {
-		const indexSrc = loadFile(INDEX_PATH);
-		const match = indexSrc.match(/const\s+PLATFORM_NAME\s*=\s*['"]([^'"]+)['"]/);
+	test('pluginAlias matches PLATFORM_NAME constant', () => {
+		const constantsSrc = loadFile(CONSTANTS_PATH);
+		const match = constantsSrc.match(/const\s+PLATFORM_NAME\s*=\s*['"]([^'"]+)['"]/);
 		expect(match).not.toBeNull();
 		const platformName = match[1];
 		expect(schema.pluginAlias).toBe(platformName);
+		// And confirm the constant is actually exported from lib/constants.js
+		const { PLATFORM_NAME } = require('../../lib/constants');
+		expect(PLATFORM_NAME).toBe(platformName);
 	});
 
 	test('schema.properties is an object with at least the required keys', () => {

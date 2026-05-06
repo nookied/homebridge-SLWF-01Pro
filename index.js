@@ -1,8 +1,5 @@
 const Esphome = require('./lib/esphome');
-
-const PLUGIN_NAME = 'homebridge-slwf-01pro';
-const PLATFORM_NAME = 'SLWFOnePro';
-const ACCESSORY_SCHEMA_VERSION = 3;
+const { PLUGIN_NAME, PLATFORM_NAME, ACCESSORY_SCHEMA_VERSION } = require('./lib/constants');
 
 class SLWFOnePro {
 	constructor(log, config, api) {
