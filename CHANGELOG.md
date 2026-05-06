@@ -7,6 +7,57 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [0.2.0] — 2026-05-06
+
+Clean separation from upstream `homebridge-esphome-ac`. Breaking config change (one-line edit) but eliminates all namespace collision risk.
+
+### ⚠️ Breaking — config.json edit required
+
+The Homebridge platform identifier has been renamed from `"ESPHomeAC"` (shared with upstream) to **`"SLWFOnePro"`** (ours alone). Update your `config.json`:
+
+```diff
+- "platform": "ESPHomeAC",
++ "platform": "SLWFOnePro",
+```
+
+Restart Homebridge after the edit. The plugin detects orphaned cached accessories from the old identifier and logs a clear warning with cleanup instructions on first start.
+
+### Why
+
+Before 0.2.0, the platform identifier was shared with upstream `homebridge-esphome-ac` for "drop-in migration" compatibility. In practice this caused two real problems:
+
+1. **Cache collisions** — when both plugins were ever installed in the same Homebridge (even temporarily during a migration), accessories cached under upstream's plugin name became orphans that no live plugin claims, but the platform identifier overlap made it ambiguous which plugin "owned" them.
+2. **Confusing logs** — Homebridge's startup log lists all installed platforms by `<plugin>.<platformName>`. Both plugins claiming `ESPHomeAC` made the dependency graph unreadable.
+
+After 0.2.0, the two plugins are completely independent: separate npm names, separate platform identifiers, no shared state. Both can coexist on the same Homebridge without interfering.
+
+### Added
+
+- **`detectOrphanedAccessories(platform)` in `lib/esphome.js`.** Best-effort scan of the bridge's `cachedAccessories.<bridgeId>` files at startup. Warns about:
+  - Accessories cached under upstream `homebridge-esphome-ac`
+  - Accessories cached under our plugin name but the **legacy** `ESPHomeAC` platform identifier (i.e. pre-0.2.0 entries left after the rename)
+  Both warnings include explicit cleanup paths (Homebridge UI step + filesystem path). Best-effort — wrapped in try/catch, never throws, falls through silently if the cache directory doesn't exist or files are malformed.
+
+### Changed
+
+- **Platform identifier `ESPHomeAC` → `SLWFOnePro`** in `index.js` `PLATFORM_NAME`, `config.schema.json` `pluginAlias`, `config-sample.json`, README, CLAUDE.md, QA_TESTS.md.
+- **Upstream git remote removed** (`git remote remove upstream`). The fork is intentionally divergent. CLAUDE.md fork rules updated; if anyone needs upstream history they can re-add the remote ad-hoc.
+
+### Migration
+
+For anyone on `homebridge-slwf-01pro@0.1.x`:
+1. `sudo npm install -g homebridge-slwf-01pro@latest`
+2. Edit `config.json`: `"platform": "ESPHomeAC"` → `"platform": "SLWFOnePro"` (and the `name` field if you used the default).
+3. Restart Homebridge.
+4. Log will warn about the orphaned 0.1.x cached accessories. Clean via Homebridge UI → Settings → Remove Single Cached Accessory.
+
+For anyone migrating from upstream `homebridge-esphome-ac`:
+1. `sudo npm uninstall -g homebridge-esphome-ac && sudo npm install -g homebridge-slwf-01pro`
+2. Same `config.json` edit as above.
+3. Restart. Log warns about upstream's orphaned cache entries. Clean via UI.
+
+---
+
 ## [0.1.2] — 2026-05-06
 
 Critical bug fix surfaced by the first real-hardware test of 0.1.0/0.1.1.

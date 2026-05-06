@@ -1,7 +1,7 @@
 const ESPHome = require('./lib/esphome');
 
 const PLUGIN_NAME = 'homebridge-slwf-01pro';
-const PLATFORM_NAME = 'ESPHomeAC';
+const PLATFORM_NAME = 'SLWFOnePro';
 
 class ESPHomeAC {
 	constructor(log, config, api) {

@@ -9,8 +9,8 @@
   "description": "Sample config for the homebridge-SLWF-01Pro fork. Pick auto-discovery OR manual devices, or both.",
   "platforms": [
     {
-      "platform": "ESPHomeAC",
-      "name": "ESPHomeAC",
+      "platform": "SLWFOnePro",
+      "name": "SLWFOnePro",
       "debug": false,
       "autoDiscover": true,
       "discoveryTimeout": 5,

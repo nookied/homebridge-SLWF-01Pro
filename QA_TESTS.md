@@ -110,6 +110,8 @@ These are bugs that broke previous versions. Verify they stay fixed:
 - [ ] **`lastTargetState` survives restart** *(only works with dynamic platform)*. Set AC to Heat, restart Homebridge, tap Off then On — should resume in Heat, not the default Cool.
 - [ ] **HEAT_COOL devices show AUTO button** *(broken in upstream 0.0.4 — only AUTO=6 was handled)*. If your device's mode dropdown shows `HEAT_COOL` (not `AUTO`), the HomeKit AUTO button must still appear and work.
 - [ ] **StatusFault flips on disconnect** — pull the dongle's power for 30 sec; the AC tile in HomeKit shows a red badge / "Not Responding" while disconnected; reverts to normal on reconnect.
+- [ ] **Construction succeeds for devices without `unique_id` set in YAML** *(broken in 0.1.0/0.1.1; fixed in 0.1.2)*. Reproduce: an ESPHome device whose `climate:` block doesn't set `unique_id` should still get a stable HomeKit accessory; the log should show `Initialized "<name>" with N mapped entit(y|ies)` not `Failed to initialize ...: Received undefined`.
+- [ ] **Upstream-orphan warning fires when applicable** *(0.2.0+)*. If you upgraded from upstream `homebridge-esphome-ac`, the first launch logs `Detected N cached accessor… from upstream "homebridge-esphome-ac"` with cleanup instructions. After cleanup, the warning stops appearing.
 
 ## 6. Edge cases
 

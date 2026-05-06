@@ -6,7 +6,8 @@ This file is the canonical persistent memory for this project. Any assistant/age
 
 ## Project Overview
 
-**npm name:** `homebridge-slwf-01pro` *(renamed from upstream's `homebridge-esphome-ac` to avoid collision; the platform identifier in users' `config.json` stays `"ESPHomeAC"` for migration compat)*
+**npm name:** `homebridge-slwf-01pro` *(renamed from upstream's `homebridge-esphome-ac`)*
+**Platform identifier:** `SLWFOnePro` *(renamed from upstream's `ESPHomeAC` in v0.2.0 to guarantee no namespace collision when both plugins are installed)*
 **Type:** Homebridge plugin (Node.js, CommonJS)
 **Purpose:** Expose ESPHome climate entities — primarily the **[SMLIGHT SLWF-01Pro](https://smartlight.me/smart-home-devices/wifi-devices/wifi-dongle-air-conditioners-midea-idea-electrolux-for-home-assistant)** Wi-Fi dongle flashed with ESPHome — as HomeKit `HeaterCooler` accessories. Hardware-agnostic: any ESPHome `climate:` component (e.g. ESP32 with [`midea_ac`](https://esphome.io/components/climate/midea.html) directly soldered) is also picked up.
 **Repo:** [`https://github.com/nookied/homebridge-SLWF-01Pro`](https://github.com/nookied/homebridge-SLWF-01Pro) — **maintained fork**
@@ -31,8 +32,8 @@ Compatible AC brands (per SMLIGHT): Midea, Idea, Electrolux, Beko, Neoclima, Bos
 ### Fork rules
 
 - This is a **maintained fork published to npm under a distinct name** (`homebridge-slwf-01pro`). The upstream (`homebridge-esphome-ac`) is unaffected and still on npm at 0.0.4.
-- The HomeKit *platform identifier* in users' `config.json` stays `"platform": "ESPHomeAC"` for migration compatibility — only the npm package name differs.
-- The `upstream` git remote IS configured (`https://github.com/nitaybz/homebridge-esphome-ac.git`) — fine to fetch/cherry-pick from, but **do not push** to it; we are not contributing back.
+- **Both the npm package name AND the Homebridge platform identifier are distinct from upstream** (npm: `homebridge-slwf-01pro`; platform: `SLWFOnePro` since v0.2.0). This guarantees no cache collisions or config-namespace conflicts when both plugins are installed on the same Homebridge.
+- The `upstream` git remote was **deliberately removed** (since v0.2.0). The fork is intentionally divergent; the upstream's release cadence (last release ~2 years ago) doesn't justify the round-trip. If you need to fetch upstream history for reference, run `git remote add upstream https://github.com/nitaybz/homebridge-esphome-ac.git` ad-hoc, fetch, then remove again.
 - `package.json` `repository.url` MUST exactly match the GitHub repo URL (`https://github.com/nookied/homebridge-SLWF-01Pro.git`). npm sigstore provenance is strict — a mismatch causes `npm publish` to fail with HTTP 422 (warmup4ie hit this once).
 - CI runs lint + tests + smoke on Node 18/20/22/24 for every push (`.github/workflows/ci.yml`). Releases are tag-driven: `npm version patch|minor|major && git push --follow-tags` triggers `release.yml`, which publishes to npm with provenance and creates a GitHub Release.
 
@@ -133,8 +134,8 @@ homebridge-SLWF-01Pro/
 
 ## How it runs
 
-1. Homebridge calls `module.exports(api)` → `api.registerPlatform("homebridge-slwf-01pro", "ESPHomeAC", ESPHomeAC, true)` (4th arg `true` = dynamic platform).
-2. Homebridge instantiates `ESPHomeAC(log, config, api)`. The constructor reads config (`name`, `debug`, `devices[]`, `autoDiscover`, `discoveryTimeout`, all `disable*` flags), sets up `this.accessories = []` and `this.esphomeDevices = {}` (keyed by `device.host`), then registers `api.on('didFinishLaunching', ...)`.
+1. Homebridge calls `module.exports(api)` → `api.registerPlatform("homebridge-slwf-01pro", "SLWFOnePro", ESPHomeAC, true)` (4th arg `true` = dynamic platform). The platform class is named `ESPHomeAC` internally; the user-facing identifier is `SLWFOnePro`.
+2. Homebridge instantiates `ESPHomeAC(log, config, api)`. The constructor reads config (`name`, `debug`, `devices[]`, `autoDiscover`, `discoveryTimeout`, all `disable*` flags), sets up `this.accessories = []` and `this.esphomeDevices = {}` (keyed by `device.host`), then registers `api.on('didFinishLaunching', ...)`. On `didFinishLaunching`, `lib/esphome.js init()` runs `detectOrphanedAccessories()` first (best-effort scan of the bridge's `cachedAccessories.*` for upstream/legacy entries — logs warnings, never throws).
 3. For each accessory in Homebridge's on-disk cache, `configureAccessory(accessory)` is called synchronously — we stash it in `this.accessories[]`. Service handlers are NOT bound here.
 4. After all `configureAccessory` calls, `didFinishLaunching` fires → `await esphome.init()`:
    - Build the **device list**: manual `this.devices[]` first, then if `autoDiscover` is true, call `discovery.discoverDevices({ timeout })` to mDNS-browse `_esphomelib._tcp` and append any discovered devices not already present (deduped by host, case-insensitive).
@@ -215,8 +216,8 @@ The `@2colors/esphome-native-api` exposes ESPHome's protobuf API. Climate entiti
 ```jsonc
 {
   "platforms": [{
-    "platform": "ESPHomeAC",            // identifier — never change for migration compat
-    "name": "ESPHomeAC",                // optional log prefix
+    "platform": "SLWFOnePro",           // identifier — must match config.schema.json's pluginAlias
+    "name": "SLWFOnePro",               // optional log prefix
     "debug": false,                     // optional; route easyDebug to log() instead of log.debug()
     "autoDiscover": false,              // optional; mDNS-browse for ESPHome devices on the local network
     "discoveryTimeout": 5,              // optional; seconds to wait for mDNS responses (default 5)

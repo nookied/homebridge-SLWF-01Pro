@@ -56,8 +56,8 @@ The simplest config — auto-discover everything on the local network:
 {
   "platforms": [
     {
-      "platform": "ESPHomeAC",
-      "name": "ESPHomeAC",
+      "platform": "SLWFOnePro",
+      "name": "SLWFOnePro",
       "autoDiscover": true
     }
   ]
@@ -70,8 +70,8 @@ Or fully manual (required for encrypted devices and any device not on the same b
 {
   "platforms": [
     {
-      "platform": "ESPHomeAC",
-      "name": "ESPHomeAC",
+      "platform": "SLWFOnePro",
+      "name": "SLWFOnePro",
       "debug": false,
       "devices": [
         {
@@ -93,8 +93,8 @@ You can mix both — listed devices in `devices[]` take precedence; auto-discove
 
 | Key | Required | Default | Notes |
 |---|---|---|---|
-| `platform` | yes | — | Must be exactly `"ESPHomeAC"` (the platform identifier — same as the upstream plugin so existing configs migrate without edits) |
-| `name` | no | `ESPHomeAC` | Display name in Homebridge logs |
+| `platform` | yes | — | Must be exactly `"SLWFOnePro"` (the platform identifier — distinct from upstream `homebridge-esphome-ac`'s `"ESPHomeAC"` to guarantee no namespace collision when both plugins are installed). Pre-0.2.0 configs using `"ESPHomeAC"` need a one-line edit. |
+| `name` | no | `SLWFOnePro` | Display name in Homebridge logs |
 | `debug` | no | `false` | Surface ESPHome state-change chatter to the main log instead of `log.debug` |
 | `autoDiscover` | no | `false` | mDNS-browse for ESPHome devices on the local network and create accessories automatically. Encrypted devices still need a manual `devices[]` entry — the Noise key is not broadcast. |
 | `discoveryTimeout` | no | `5` | Seconds to wait for mDNS responses before continuing. |
@@ -184,17 +184,37 @@ If the device advertises any swing mode beyond OFF, a HomeKit Swing toggle is ex
 
 ## Migration
 
-If you're moving from the upstream `homebridge-esphome-ac`:
+### From upstream `homebridge-esphome-ac`
 
-```bash
-sudo npm uninstall -g homebridge-esphome-ac
-sudo npm install -g homebridge-slwf-01pro
-sudo systemctl restart homebridge   # or: hb-service restart
-```
+Both the npm package name AND the Homebridge platform identifier are different from upstream — that's deliberate, and it means the two plugins never share cache or namespace. Migration is two short steps:
 
-**Your `config.json` does not need changes.** The platform identifier (`"platform": "ESPHomeAC"`) is unchanged for compatibility — only the npm package name differs.
+1. **Replace the package**:
+   ```bash
+   sudo npm uninstall -g homebridge-esphome-ac
+   sudo npm install -g homebridge-slwf-01pro
+   ```
 
-If accessories appear duplicated after the migration, clear Homebridge's cached accessories from the UI (Settings → Remove Single Cached Accessory) for the orphaned ones from the old plugin. The new plugin will re-pair them automatically on the next restart with stable UUIDs derived from each device's ESPHome `entity.config.uniqueId`.
+2. **Edit `config.json`** — change `"platform": "ESPHomeAC"` to `"platform": "SLWFOnePro"`:
+   ```jsonc
+   {
+     "platforms": [
+       {
+         "platform": "SLWFOnePro",   // ← was "ESPHomeAC"
+         "name": "SLWFOnePro",       // ← rename to match (or keep your custom name)
+         "autoDiscover": true,
+         "devices": [ /* ...same as before... */ ]
+       }
+     ]
+   }
+   ```
+
+3. **Restart Homebridge**: `sudo systemctl restart homebridge` (or via UI).
+
+The plugin will detect any cached accessories left over from upstream and **log a warning** with cleanup instructions on startup. Clean them via Homebridge UI → Settings → Remove Single Cached Accessory, or stop the (child) bridge and delete the relevant `cachedAccessories.<bridgeId>` file. The new accessories from this plugin will re-pair automatically on the next restart with stable UUIDs derived from each device's ESPHome `unique_id` (or from the MAC + `object_id` when `unique_id` isn't set).
+
+### From a pre-0.2.0 release of this plugin
+
+If you upgraded from `homebridge-slwf-01pro@0.1.x`, the platform identifier rename is the only change you need to apply (step 2 above). The plugin will detect old `"ESPHomeAC"` cached entries and log a warning the same way.
 
 ## Known SLWF-01Pro quirks
 
