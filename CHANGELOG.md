@@ -7,6 +7,30 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [0.3.1] — 2026-05-06
+
+Hotfix for "Out of compliance" error when adding the bridge to Apple Home.
+
+### Fixed
+
+- **Apple Home flagged the child bridge as "Out of compliance" during pairing.** Root cause: `DeviceAccessory` was constructed immediately on the ESPHome client's `'initialized'` event, but ESPHome state messages may not have arrived yet at that moment. Required HomeKit characteristics like `CurrentTemperature`, `CoolingThresholdTemperature`, and `HeatingThresholdTemperature` got `.updateValue(undefined)` calls. When Apple Home read the accessory tree during pairing, those characteristics returned `null` instead of valid floats — Apple's HAP validator rejects this as malformed metadata and refuses to pair.
+
+  Three layers of defense applied:
+  1. **Wait for first state event** — `lib/esphome.js` now defers `DeviceAccessory` construction until the climate entity has emitted at least one `'state'` event (5 s timeout fallback). For most devices this adds < 100 ms to startup; for slow-responding devices the warning logs and we proceed with safe defaults.
+  2. **Safe defaults at construction** — `addClimateService()` substitutes the visual-min/max-temperature midpoint for `CurrentTemperature` and `visualMinTemperature` for the threshold characteristics if state is still missing (defense in depth).
+  3. **`safeUpdate(characteristic, value)` helper** — wraps every characteristic update; skips the call entirely when value is `null` / `undefined` / `NaN` / `Infinity`.
+
+- **`FirmwareRevision` validation.** HAP requires the format `\d+(\.\d+){0,2}` (e.g. `2024.7.3`). ESPHome's `esphomeVersion` sometimes carries suffixes like `-dev` or `-beta`, which would have produced an invalid characteristic value. New `sanitizeFirmwareRevision(raw)` helper strips anything past the SemVer prefix; if the prefix doesn't match, the characteristic is omitted (Apple Home falls back to the plugin version).
+
+- **Primary service marked explicitly.** `addClimateService()` now calls `setPrimaryService(true)` on the `Service.HeaterCooler`. With companion DRY/FAN_ONLY/Beeper/Display Switch services on the same accessory, the absence of an explicit primary previously left the choice up to HAP-NodeJS — Apple Home iOS 16+ is stricter about this and could pick a Switch as primary, leading to a confusing accessory tile in Home.
+
+### Internal
+
+- New constants: `FIRST_STATE_TIMEOUT_MS = 5000` in `lib/esphome.js`.
+- New helpers: `isPresent(value)`, `safeUpdate(characteristic, value)`, `sanitizeFirmwareRevision(raw)` in `lib/DeviceAccessory.js`.
+
+---
+
 ## [0.3.0] — 2026-05-06
 
 Final piece of the "fully independent plugin" story: HomeKit UUIDs are now namespaced so this plugin can run **alongside** upstream `homebridge-esphome-ac` (or any other plugin that hashes from the same ESPHome `unique_id`) on the same Homebridge bridge without UUID collisions.
