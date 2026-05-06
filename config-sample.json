@@ -6,11 +6,11 @@
     "pin": "031-45-154"
   },
 
-  "description": "Sample config for the homebridge-SLWF-01Pro fork. Pick auto-discovery OR manual devices, or both.",
+  "description": "Sample config for homebridge-slwf-01pro. Pick auto-discovery, manual devices, or both.",
   "platforms": [
     {
       "platform": "SLWFOnePro",
-      "name": "SLWFOnePro",
+      "name": "SLWF-01Pro",
       "debug": false,
       "autoDiscover": true,
       "discoveryTimeout": 5,

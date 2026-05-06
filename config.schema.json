@@ -2,8 +2,8 @@
   "pluginAlias": "SLWFOnePro",
   "pluginType": "platform",
   "singular": true,
-  "headerDisplay": "Homebridge plugin for the **SMLIGHT SLWF-01Pro** Wi-Fi dongle and other ESPHome `Climate` entities. Supports mDNS auto-discovery, multi-entity bundling (humidity / outdoor temperature / power sensors, Beeper / Display switches, DRY / FAN_ONLY mode tiles).",
-  "footerDisplay": "Maintained fork by [@nookied](https://github.com/nookied/homebridge-SLWF-01Pro). Based on `homebridge-esphome-ac` by [@nitaybz](https://github.com/nitaybz/homebridge-esphome-ac).",
+  "headerDisplay": "Homebridge plugin for the **[SMLIGHT SLWF-01Pro](https://smartlight.me/smart-home-devices/wifi-devices/wifi-dongle-air-conditioners-midea-idea-electrolux-for-home-assistant)** Wi-Fi AC dongle. Supports mDNS auto-discovery on the local network and multi-entity bundling (humidity / outdoor temperature / power sensors, Beeper / Display switches, DRY / FAN_ONLY mode tiles).",
+  "footerDisplay": "Maintained by [@nookied](https://github.com/nookied/homebridge-SLWF-01Pro). Speaks the [ESPHome native API](https://esphome.io/components/api.html), so any ESPHome Climate device on the local network is also supported.",
   "schema": {
     "type": "object",
     "properties": {
@@ -14,13 +14,13 @@
       },
       "debug": {
         "title": "Enable Debug Logs",
-        "description": "Surface ESPHome state-change chatter to the main log (otherwise sent to log.debug).",
+        "description": "Surface device state-change chatter to the main log (otherwise sent to log.debug).",
         "type": "boolean",
         "default": false
       },
       "autoDiscover": {
-        "title": "Auto-discover ESPHome devices via mDNS",
-        "description": "Browses _esphomelib._tcp on the local network and adds any ESPHome devices with a Climate entity. Only works for unencrypted ESPHome API. Manually configured devices in the list below take precedence and are required for encrypted devices.",
+        "title": "Auto-discover SLWF-01Pro devices via mDNS",
+        "description": "Browses the local network for ESPHome `_esphomelib._tcp` services and adds any device that exposes a Climate entity. Only works for unencrypted devices. Manually configured devices in the list below take precedence and are required for any device with the ESPHome API encryption key set.",
         "type": "boolean",
         "default": false
       },
@@ -85,14 +85,16 @@
               "minLength": 1
             },
             "port": {
-              "title": "ESPHome native API port",
+              "title": "Native API port",
+              "description": "ESPHome's native API port. Default 6053; rarely needs changing.",
               "type": "integer",
               "default": 6053,
               "minimum": 1,
               "maximum": 65535
             },
             "encryptionKey": {
-              "title": "ESPHome API Noise encryption key (base64)",
+              "title": "API encryption key (base64)",
+              "description": "If your device's ESPHome YAML has `api.encryption.key:` set, paste the same base64 key here. Leave empty if encryption isn't enabled.",
               "type": "string"
             },
             "disableHumiditySensor": {
@@ -164,7 +166,7 @@
       "key": "devices",
       "type": "array",
       "title": "Manual device list",
-      "description": "Optional. Required for encrypted ESPHome devices. Per-device toggles override the globals.",
+      "description": "Optional. Required for any device with the ESPHome API encryption key set (mDNS doesn't broadcast it, so auto-discovery alone won't work for those). Per-device toggles override the globals.",
       "orderable": false,
       "buttonText": "Add Device",
       "expandable": true,

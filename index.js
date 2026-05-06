@@ -1,10 +1,10 @@
-const ESPHome = require('./lib/esphome');
+const Esphome = require('./lib/esphome');
 
 const PLUGIN_NAME = 'homebridge-slwf-01pro';
 const PLATFORM_NAME = 'SLWFOnePro';
 const ACCESSORY_SCHEMA_VERSION = 2;
 
-class ESPHomeAC {
+class SLWFOnePro {
 	constructor(log, config, api) {
 		this.api = api;
 		this.log = log;
@@ -36,7 +36,7 @@ class ESPHomeAC {
 		};
 
 		this.api.on('didFinishLaunching', () => {
-			Promise.resolve(ESPHome.init.call(this)).catch(err => {
+			Promise.resolve(Esphome.init.call(this)).catch(err => {
 				this.log.error(`Plugin initialization failed: ${err.message || err}`);
 			});
 		});
@@ -55,5 +55,5 @@ class ESPHomeAC {
 }
 
 module.exports = (api) => {
-	api.registerPlatform(PLUGIN_NAME, PLATFORM_NAME, ESPHomeAC, true);
+	api.registerPlatform(PLUGIN_NAME, PLATFORM_NAME, SLWFOnePro, true);
 };

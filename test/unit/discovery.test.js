@@ -1,7 +1,7 @@
 const { prettyNameFromHostname, dedupeDevices } = require('../../lib/discovery');
 
 describe('prettyNameFromHostname', () => {
-	test('typical ESPHome auto-name', () => {
+	test('typical SLWF-01Pro auto-discovery hostname', () => {
 		expect(prettyNameFromHostname('air-conditioner-fae810')).toBe('Air Conditioner Fae810');
 	});
 	test('strips trailing .local', () => {

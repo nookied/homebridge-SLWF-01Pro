@@ -7,6 +7,45 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [0.4.0] — 2026-05-06
+
+Naming cleanup. User-visible "ESPHome AC" / "ESPHomeAC" branding is now consistently **SLWF-01Pro**; technical references to the underlying ESPHome protocol (native API, mDNS service, Climate entity type) remain accurate where they describe the wire format the plugin speaks.
+
+### Breaking
+
+- **No config breakage.** Platform identifier (`SLWFOnePro`) and npm name (`homebridge-slwf-01pro`) are unchanged from 0.3.x. Existing configs and HomeKit pairings continue to work.
+- Internal class `ESPHomeAC` in `index.js` renamed to `SLWFOnePro`. Visible only in stack traces.
+
+### Changed
+
+- **`package.json` `displayName`** simplified from "Homebridge SLWF-01Pro / ESPHome AC" to **"Homebridge SLWF-01Pro"**. Cleaner in the Homebridge UI plugin browser and matches the npm package name.
+- **`package.json` `description`** rewritten to lead with SLWF-01Pro and the SMLIGHT brand; ESPHome native API mentioned as the underlying protocol, not the headline product.
+- **`package.json` `keywords`** pruned: dropped `homebridge-esphome`, `homebridge-esphome-ac`, `esphome-ac` (upstream-related, not relevant for this fork's npm discoverability); kept `slwf`, `slwf-01pro`, `smlight`, AC-brand names; added `air-conditioner`.
+- **`config.schema.json`** copy refreshed:
+  - `headerDisplay` linked to the SMLIGHT product page; dropped "ESPHome `Climate` entities" framing in favour of "SLWF-01Pro Wi-Fi AC dongle"
+  - `footerDisplay` mentions ESPHome native API as the underlying protocol (correct framing for users who want to use the plugin with non-SLWF ESPHome devices)
+  - `debug.description` simplified: "device state-change chatter" instead of "ESPHome state-change chatter"
+  - `autoDiscover.title` changed to "Auto-discover SLWF-01Pro devices via mDNS"; description still references the actual `_esphomelib._tcp` mDNS service since that's the literal technical fact
+  - `port` and `encryptionKey` titles simplified ("Native API port", "API encryption key (base64)")
+  - Per-device toggles unchanged
+- **Log strings**:
+  - "Creating new ESPHome AC accessory" → "Creating new SLWF-01Pro accessory"
+  - "ESPHome device …reconnected" → "Device …reconnected"
+  - "No ESPHome devices configured…" → "No SLWF-01Pro / ESPHome devices configured…"
+  - "Browsing mDNS for ESPHome devices" / "Discovered N ESPHome devices" — kept (factually accurate; the mDNS service is `_esphomelib._tcp`).
+- **Accessory metadata** (Apple Home → ⓘ on each AC):
+  - Manufacturer fallback: `'ESPHome'` → `'SMLIGHT'` (only used when the device doesn't report its own manufacturer; SMLIGHT is the actual hardware vendor)
+  - Model fallback: `'ESPHome AC'` → `'SLWF-01Pro'`
+  - Real `deviceInfo.manufacturer` / `deviceInfo.model` from ESPHome still take precedence — these are only fallbacks when the device YAML doesn't provide them.
+- **`config-sample.json`** `name` field updated from `"ESPHomeAC"` to `"SLWF-01Pro"`.
+
+### Internal
+
+- All `[ESPHomeAC]` log prefixes will become `[SLWF-01Pro]` (or whatever you set in the `name` config field) once your `config.json`'s `name` is updated. Existing `name: "ESPHomeAC"` configs continue to work — the prefix just keeps the legacy value until you change it.
+- 120 unit tests still pass.
+
+---
+
 ## [0.3.3] — 2026-05-06
 
 Fix the "config validation failed, you can still save your changes" warning shown by the Homebridge UI when editing the plugin's settings.
