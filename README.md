@@ -153,7 +153,7 @@ Per ESPHome device, all of these services land on a single HomeKit accessory if 
 
 Entities the plugin deliberately ignores: Wi-Fi RSSI, Uptime, Factory Reset (dangerous to expose).
 
-Power monitoring is intentionally isolated in a linked Outlet service rather than attached directly to the HeaterCooler service. This keeps the primary AC service limited to standard HeaterCooler characteristics, which is friendlier to Apple Home during bridge pairing while still allowing Eve-compatible clients to read consumption.
+Power monitoring is intentionally isolated in a linked, hidden Outlet service rather than attached directly to the HeaterCooler service. The Outlet doesn't render as a separate tile in Apple Home (it's marked hidden, so Home skips it), but Eve.app and other HAP-direct clients still see the service in the database and can read `CurrentPowerConsumption`. This keeps the primary AC tile limited to standard HeaterCooler characteristics, which is friendlier to Apple Home during bridge pairing.
 
 ## Behaviour
 

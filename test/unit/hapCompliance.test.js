@@ -81,6 +81,7 @@ class FakeService {
 		this.characteristics = new Map();
 		this.linkedServices = [];
 		this.isPrimaryService = false;
+		this.isHiddenService = false;
 		this._addedOptional = new Set();
 	}
 	getCharacteristic(charCtor) {
@@ -112,6 +113,7 @@ class FakeService {
 		return this;
 	}
 	setPrimaryService(v) { this.isPrimaryService = !!v; return this; }
+	setHiddenService(v) { this.isHiddenService = !!v; return this; }
 	addLinkedService(svc) { this.linkedServices.push(svc); return this; }
 }
 
@@ -309,6 +311,23 @@ describe('HAP-compliance: Eve power service isolation', () => {
 		expect(heaterCooler.testCharacteristic(EvePower)).toBe(false);
 		expect(heaterCooler.linkedServices).toContain(power);
 		expect(power.getCharacteristic(EvePower).value).toBe(42);
+	});
+
+	test('the linked Outlet is hidden from Apple Home (data-carrier only)', () => {
+		const platform = makeFakePlatform();
+		platform.api.registerPlatformAccessories = () => {};
+		const climate = makeFakeClimateEntity();
+		const powerSensor = { type: 'Sensor', name: 'Power', config: { name: 'Power', objectId: 'power' }, state: { state: 42 }, on: () => {} };
+		new DeviceAccessory({
+			device: { name: 'AC', host: '192.168.1.10' },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			entities: { climate, powerSensor },
+			platform,
+		});
+		const acc = platform.accessories[0];
+		const power = acc.getServiceById(Service.Outlet, 'power');
+		expect(power).toBeDefined();
+		expect(power.isHiddenService).toBe(true);
 	});
 
 	test('legacy Eve power characteristic is removed from cached HeaterCooler service', () => {

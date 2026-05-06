@@ -12,13 +12,14 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 ### Fixed
 
 - **Moved Eve power monitoring off the standard `HeaterCooler` service.** `CurrentPowerConsumption` now lives on a linked `Service.Outlet` named `<AC> Power` instead of being added as a custom characteristic directly to the AC's primary HeaterCooler service. This keeps the primary service shape closer to HomeKit's standard HeaterCooler definition and removes one suspected Apple Home pairing/non-compliance trigger.
+- **The linked Outlet is hidden from Apple Home.** It carries `CurrentPowerConsumption` for Eve.app and other HAP-direct clients but doesn't render as a separate (toggle-only) tile in Apple Home, keeping the visible service count down — which also addresses the secondary "service-count tolerance" pairing hypothesis. The snap-back `On` handler is retained as a fallback for HAP-NodeJS versions that predate `setHiddenService`.
 - **Cached legacy Eve power characteristics are removed from HeaterCooler.** `ACCESSORY_SCHEMA_VERSION` is bumped to 5 so existing accessories are evicted and rebuilt cleanly on upgrade; the runtime also removes the legacy characteristic defensively if encountered.
 - **Power service state is more explicit.** The linked Outlet stays logically on, reports `OutletInUse` based on positive power draw, and continues to feed `fakegato-history` entries when available.
 - **Target-temperature clamping now uses default visual bounds** when ESPHome omits `visualMinTemperature` / `visualMaxTemperature`, matching the safe bounds already used for HAP `setProps`.
 
 ### Internal
 
-- Added HAP regression tests proving Eve power is attached to a linked Outlet service, not HeaterCooler, and that stale HeaterCooler power characteristics are removed from cached accessories.
+- Added HAP regression tests proving Eve power is attached to a linked Outlet service (not HeaterCooler), the Outlet is marked hidden, and stale HeaterCooler power characteristics are removed from cached accessories.
 
 ---
 
