@@ -2,15 +2,15 @@
   "pluginAlias": "SLWFOnePro",
   "pluginType": "platform",
   "singular": true,
-  "headerDisplay": "Homebridge plugin for ESPHome AC controllers (SLWF-01Pro Wi-Fi dongle and other ESPHome `Climate` entities). Supports auto-discovery, humidity / outdoor-temperature / power sensors, beeper / display switches, and DRY / FAN_ONLY mode tiles.",
-  "footerDisplay": "Original by @nitaybz; SLWF-01Pro fork by @nookied.",
+  "headerDisplay": "Homebridge plugin for the **SMLIGHT SLWF-01Pro** Wi-Fi dongle and other ESPHome `Climate` entities. Supports mDNS auto-discovery, multi-entity bundling (humidity / outdoor temperature / power sensors, Beeper / Display switches, DRY / FAN_ONLY mode tiles).",
+  "footerDisplay": "Maintained fork by [@nookied](https://github.com/nookied/homebridge-SLWF-01Pro). Based on `homebridge-esphome-ac` by [@nitaybz](https://github.com/nitaybz/homebridge-esphome-ac).",
   "schema": {
     "type": "object",
     "properties": {
       "name": {
         "title": "Plugin Name (for logs)",
         "type": "string",
-        "default": "ESPHomeAC",
+        "default": "SLWFOnePro",
         "required": false
       },
       "debug": {

@@ -7,6 +7,42 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [0.3.2] — 2026-05-06
+
+Config-schema polish + a regression-prevention test suite for the Homebridge UI form.
+
+### Fixed
+
+- **`config.schema.json` `name` default was stale** — `"ESPHomeAC"` left over from before the 0.2.0 platform rename to `SLWFOnePro`. New users adding the plugin via the Homebridge UI got a confusing log prefix that didn't match the platform identifier. Now defaults to `"SLWFOnePro"`.
+- **`headerDisplay` and `footerDisplay`** rewritten to mention the SLWF brand explicitly and link to the maintainer + upstream.
+
+### Added
+
+- **`test/unit/configSchema.test.js`** — 12 new tests (100 total now, up from 87) that automatically catch any future drift between the schema and the plugin code:
+  - Schema parses as valid JSON
+  - `pluginAlias` matches `PLATFORM_NAME` in `index.js` (won't silently rebrand the UI alias without rebranding the actual plugin)
+  - Every property in `schema.properties` is read by `index.js` (no dead schema fields the UI exposes but the plugin ignores)
+  - Per-device disable flags match platform-level disable flags 1:1 (so toggling a flag in the UI maps to a real code path)
+  - Layout references resolve to actual property keys (no typo'd field references in the form definition)
+  - `discoveryTimeout` condition references `autoDiscover` (so the field correctly hides when auto-discovery is off)
+  - All boolean disable flags default to `false`
+  - `name` default matches the platform identifier
+  - `discoveryTimeout` and `port` numeric constraints are sane
+
+### Why this matters
+
+The Homebridge UI form is rendered directly from `config.schema.json` by `homebridge-config-ui-x`. A typo, stale default, or unreferenced field shows up as a confused user not as a runtime error — the plugin still works, but the user's clicks don't end up where they think. The new tests fail CI if the schema drifts from the code, eliminating that whole class of silent UI bugs.
+
+### Verifying the UI is writing your config correctly
+
+After saving in the Homebridge UI, run:
+```bash
+sudo cat /var/lib/homebridge/config.json | jq '.platforms[] | select(.platform == "SLWFOnePro")'
+```
+You should see the JSON block matching what you toggled in the UI. If you toggled `disableHumiditySensor` ON for one device, expect `"disableHumiditySensor": true` under that device's block. If a UI toggle doesn't appear in this output, the UI didn't persist it.
+
+---
+
 ## [0.3.1] — 2026-05-06
 
 Hotfix for "Out of compliance" error when adding the bridge to Apple Home.
