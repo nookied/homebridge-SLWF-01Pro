@@ -7,6 +7,32 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [0.4.1] — 2026-05-06
+
+HAP-level fixes for "accessories visible in Homebridge but not in Apple Home" after a successful bridge pairing.
+
+### Fixed
+
+- **No `AccessoryCategory` was set on accessories**, so HAP defaulted to `OTHER (1)`. Apple Home iOS 16+ uses the category to pick the accessory icon AND to group it correctly in the Home app. Without an explicit category, accessories can sometimes be silently grouped under "Other" and hidden from the main rooms grid.
+  - Now sets `Categories.AIR_CONDITIONER (21)` on every SLWF-01Pro accessory at creation time, with a numeric fallback `21` if the HAP-NodeJS Categories enum isn't exposed.
+- **Optional services were not linked to the primary HeaterCooler service.** Apple Home expects sensors and companion switches to be `addLinkedService`-linked to the parent service so they're grouped in the accessory's UI panel rather than appearing as orphaned services. Now linked: HumiditySensor, OutdoorTempSensor, Beeper Switch, Display Switch, DRY-mode Switch, FAN_ONLY-mode Switch — all linked to the HeaterCooler primary.
+
+### Internal
+
+- **`ACCESSORY_SCHEMA_VERSION` bumped to 3.** This forces Homebridge to evict any 0.3.x/0.4.0 cached accessories that were created without the category and without linked services. They get re-registered cleanly on first start with the new metadata. Users will see one `Evicting N cached accessories from an older plugin schema` line in the log.
+- 120 unit tests still pass.
+
+### Migration
+
+After upgrading to 0.4.1:
+1. `sudo npm install -g homebridge-slwf-01pro@latest`
+2. `sudo hb-service restart`
+3. The log will show the schema-eviction warning + 6 fresh `Initialized "..." with N mapped entities` lines.
+4. **In Apple Home on your iPhone**: force-quit Apple Home (swipe up → swipe Home away), then reopen — Apple Home re-fetches the accessory list from the bridge and the 6 ACs should now appear under the "Homebridge SLWF01Pro" bridge tile.
+5. If they still don't appear: in Apple Home, long-press the bridge tile → ⓘ → **Remove Bridge from Home**, then re-pair using the PIN from the Homebridge log (or the Bridge Settings panel). The fresh pairing will pick up the new metadata cleanly.
+
+---
+
 ## [0.4.0] — 2026-05-06
 
 Naming cleanup. User-visible "ESPHome AC" / "ESPHomeAC" branding is now consistently **SLWF-01Pro**; technical references to the underlying ESPHome protocol (native API, mDNS service, Climate entity type) remain accurate where they describe the wire format the plugin speaks.
