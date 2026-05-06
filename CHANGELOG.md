@@ -7,6 +7,21 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [0.5.0] — 2026-05-06
+
+### Changed (default UX — affects fresh installs and any config that doesn't set the relevant flag explicitly)
+
+- **`autoDiscover` now defaults to `true`.** New installs immediately mDNS-browse the local network and register any unencrypted ESPHome AC they find. Encrypted devices still need a manual `devices[]` entry — the Noise key isn't broadcast.
+- **All companion services default to hidden.** `disableHumiditySensor`, `disableOutdoorTempSensor`, `disablePowerSensor`, `disableBeeperSwitch`, `disableDisplaySwitch`, `disableDryMode`, and `disableFanOnlyMode` now default to `true`. A fresh install gets a clean Apple Home view: just one HeaterCooler tile per AC. Flip any flag to `false` (globally or per-device) to opt back into a specific extra. This also reduces the per-accessory service count, which addresses the secondary "service-count tolerance" pairing hypothesis from the 0.4.x audit work.
+- **Per-device disable flags now override platform defaults in either direction.** Previously the override was a logical OR — meaning once a service was globally disabled, no per-device entry could re-enable it. Now an explicitly-set per-device flag (`true` *or* `false`) wins; otherwise the device inherits the platform default. Required for the new "hide all by default" world to be usable: you can keep the global hides and selectively re-enable a service for a single AC.
+
+### Heads-up
+
+- **Existing users who never set the `disable*` flags will see those companion services disappear on upgrade.** If you relied on Humidity / Outdoor Temp / Power / Beeper / Display / DRY / FAN_ONLY tiles, add the corresponding `disable*: false` entries to your platform config (or per-device).
+- **Auto-discovered devices don't persist if you later turn `autoDiscover` off.** The startup pruner unregisters any cached accessory whose host isn't in the live device list, and that list comes from `devices[]` + the current discovery scan. Copy your discovered devices into `devices[]` *before* disabling discovery if you want them to stick around.
+
+---
+
 ## [0.4.4] — 2026-05-06
 
 ### Fixed

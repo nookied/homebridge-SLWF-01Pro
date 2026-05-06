@@ -6,22 +6,32 @@
     "pin": "031-45-154"
   },
 
-  "description": "Sample config for homebridge-slwf-01pro. Pick auto-discovery, manual devices, or both.",
+  "description": "Sample config for homebridge-slwf-01pro. Defaults: autoDiscover on, all companion services hidden — opt-in via the disable* flags or per-device override.",
   "platforms": [
     {
       "platform": "SLWFOnePro",
       "name": "SLWF-01Pro",
       "debug": false,
+
       "autoDiscover": true,
       "discoveryTimeout": 5,
-      "disableHumiditySensor": false,
+
+      "disableHumiditySensor": true,
+      "disableOutdoorTempSensor": true,
+      "disablePowerSensor": true,
+      "disableBeeperSwitch": true,
+      "disableDisplaySwitch": true,
+      "disableDryMode": true,
+      "disableFanOnlyMode": true,
+
       "devices": [
         {
           "name": "Living Room AC",
           "host": "192.168.1.120",
           "port": 6053,
           "encryptionKey": "",
-          "disableHumiditySensor": true
+          "disableBeeperSwitch": false,
+          "disableDryMode": false
         }
       ]
     }

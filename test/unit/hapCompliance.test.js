@@ -461,3 +461,47 @@ describe('HAP-compliance: RotationSpeed minStep follows fan-mode count', () => {
 		expect(rs.props.minStep).toBe(33);
 	});
 });
+
+describe('Per-device disable flags override platform defaults bidirectionally', () => {
+	function buildAccessory({ platformOverrides = {}, deviceOverrides = {} } = {}) {
+		const platform = makeFakePlatform();
+		platform.api.registerPlatformAccessories = () => {};
+		Object.assign(platform, platformOverrides);
+		// Beeper switch entity present so service creation only depends on the disable flag.
+		const beeperSwitch = { type: 'Switch', name: 'Beeper', config: { name: 'Beeper', objectId: 'beeper' }, state: { state: false }, on: () => {}, setState: () => {} };
+		const climate = makeFakeClimateEntity();
+		new DeviceAccessory({
+			device: { name: 'AC', host: '192.168.1.10', ...deviceOverrides },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			entities: { climate, beeperSwitch },
+			platform,
+		});
+		return platform.accessories[0];
+	}
+
+	test('platform=true, device unset → service hidden', () => {
+		const acc = buildAccessory({ platformOverrides: { disableBeeperSwitch: true } });
+		expect(acc.getServiceById(Service.Switch, 'beeper')).toBeUndefined();
+	});
+
+	test('platform=true, device=false → service shown (re-enabled per-device)', () => {
+		const acc = buildAccessory({
+			platformOverrides: { disableBeeperSwitch: true },
+			deviceOverrides: { disableBeeperSwitch: false },
+		});
+		expect(acc.getServiceById(Service.Switch, 'beeper')).toBeDefined();
+	});
+
+	test('platform=false, device=true → service hidden (disabled per-device)', () => {
+		const acc = buildAccessory({
+			platformOverrides: { disableBeeperSwitch: false },
+			deviceOverrides: { disableBeeperSwitch: true },
+		});
+		expect(acc.getServiceById(Service.Switch, 'beeper')).toBeUndefined();
+	});
+
+	test('platform=false, device unset → service shown (inherits)', () => {
+		const acc = buildAccessory({ platformOverrides: { disableBeeperSwitch: false } });
+		expect(acc.getServiceById(Service.Switch, 'beeper')).toBeDefined();
+	});
+});

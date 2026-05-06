@@ -96,16 +96,18 @@ You can mix both — listed devices in `devices[]` take precedence; auto-discove
 | `platform` | yes | — | Must be exactly `"SLWFOnePro"` (the platform identifier — distinct from upstream `homebridge-esphome-ac`'s `"ESPHomeAC"` to guarantee no namespace collision when both plugins are installed). Pre-0.2.0 configs using `"ESPHomeAC"` need a one-line edit. |
 | `name` | no | `SLWFOnePro` | Display name in Homebridge logs |
 | `debug` | no | `false` | Surface ESPHome state-change chatter to the main log instead of `log.debug` |
-| `autoDiscover` | no | `false` | mDNS-browse for ESPHome devices on the local network and create accessories automatically. Encrypted devices still need a manual `devices[]` entry — the Noise key is not broadcast. |
+| `autoDiscover` | no | **`true`** | mDNS-browse for ESPHome devices on the local network and create accessories automatically. Encrypted devices still need a manual `devices[]` entry — the Noise key is not broadcast. ⚠️ Turning this off after it has run will *unregister* any device that wasn't also added to `devices[]` — copy your discovered devices into the list before disabling. |
 | `discoveryTimeout` | no | `5` | Seconds to wait for mDNS responses before continuing. |
-| `disableHumiditySensor` | no | `false` | Hide the HumiditySensor service for **every** device (e.g. ACs that report a fake `0 %` because no probe is fitted). |
-| `disableOutdoorTempSensor` | no | `false` | Hide the outdoor TemperatureSensor service. |
-| `disablePowerSensor` | no | `false` | Hide the linked Outlet service carrying Eve.Energy CurrentPowerConsumption. |
-| `disableBeeperSwitch` | no | `false` | Hide the Beeper Switch service. |
-| `disableDisplaySwitch` | no | `false` | Hide the Display Toggle Switch service. |
-| `disableDryMode` | no | `false` | Hide the DRY mode Switch service. |
-| `disableFanOnlyMode` | no | `false` | Hide the FAN_ONLY mode Switch service. |
+| `disableHumiditySensor` | no | **`true`** | Hide the HumiditySensor service for **every** device (e.g. ACs that report a fake `0 %` because no probe is fitted). |
+| `disableOutdoorTempSensor` | no | **`true`** | Hide the outdoor TemperatureSensor service. |
+| `disablePowerSensor` | no | **`true`** | Hide the linked Outlet service carrying Eve.Energy CurrentPowerConsumption. |
+| `disableBeeperSwitch` | no | **`true`** | Hide the Beeper Switch service. |
+| `disableDisplaySwitch` | no | **`true`** | Hide the Display Toggle Switch service. |
+| `disableDryMode` | no | **`true`** | Hide the DRY mode Switch service. |
+| `disableFanOnlyMode` | no | **`true`** | Hide the FAN_ONLY mode Switch service. |
 | `devices` | no | `[]` | Manual list of ESPHome devices. Required for encrypted devices; optional otherwise if `autoDiscover: true`. |
+
+The companion services default to **hidden** so a fresh install gives you a clean Apple Home view: just the AC tile per device. Flip any `disable*` flag to `false` to opt back in.
 
 ### Per-device keys (under `devices[]`)
 
@@ -115,15 +117,15 @@ You can mix both — listed devices in `devices[]` take precedence; auto-discove
 | `host` | yes | — | IP address or hostname of the SLWF-01Pro / ESPHome device |
 | `port` | no | `6053` | ESPHome native API port |
 | `encryptionKey` | no | `""` | Base64 ESPHome `api: encryption` key, if set in the device's YAML |
-| `disableHumiditySensor` | no | `false` | Per-device override; if true, hides the HumiditySensor for **this** device only. |
-| `disableOutdoorTempSensor` | no | `false` | Per-device override |
-| `disablePowerSensor` | no | `false` | Per-device override |
-| `disableBeeperSwitch` | no | `false` | Per-device override |
-| `disableDisplaySwitch` | no | `false` | Per-device override |
-| `disableDryMode` | no | `false` | Per-device override |
-| `disableFanOnlyMode` | no | `false` | Per-device override |
+| `disableHumiditySensor` | no | inherit | Per-device override (either direction). Set `false` to enable for this device when the platform default is `true`, or `true` to hide for this device when the platform default is `false`. |
+| `disableOutdoorTempSensor` | no | inherit | Per-device override |
+| `disablePowerSensor` | no | inherit | Per-device override |
+| `disableBeeperSwitch` | no | inherit | Per-device override |
+| `disableDisplaySwitch` | no | inherit | Per-device override |
+| `disableDryMode` | no | inherit | Per-device override |
+| `disableFanOnlyMode` | no | inherit | Per-device override |
 
-Per-device disable flags **override** the platform-wide flag (logical OR — `device[key] || platform[key]`). The platform-wide flag turns the service off for every device; the per-device flag turns it off for just that one. There's no way to enable a service that's globally disabled.
+Per-device disable flags **override the platform-wide flag in either direction**. If a per-device flag is set explicitly (to `true` or `false`), it wins; otherwise the device inherits the platform default. So you can keep the global "hide all extras" defaults and still enable specific services for a single AC.
 
 The plugin auto-discovers the climate entity's capabilities (supported modes, fan modes, swing modes, visual min/max temperatures, target step) directly from ESPHome — no model-specific config required.
 

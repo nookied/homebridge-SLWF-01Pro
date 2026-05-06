@@ -238,17 +238,18 @@ The `@2colors/esphome-native-api` exposes ESPHome's protobuf API. Climate entiti
     "platform": "SLWFOnePro",           // identifier — must match config.schema.json's pluginAlias
     "name": "SLWFOnePro",               // optional log prefix
     "debug": false,                     // optional; route easyDebug to log() instead of log.debug()
-    "autoDiscover": false,              // optional; mDNS-browse for ESPHome devices on the local network
+    "autoDiscover": true,               // default true since 0.5.0; mDNS-browses for ESPHome devices
     "discoveryTimeout": 5,              // optional; seconds to wait for mDNS responses (default 5)
 
-    // Optional global service toggles — apply to every device that doesn't override
-    "disableHumiditySensor": false,
-    "disableOutdoorTempSensor": false,
-    "disablePowerSensor": false,
-    "disableBeeperSwitch": false,
-    "disableDisplaySwitch": false,
-    "disableDryMode": false,
-    "disableFanOnlyMode": false,
+    // Global service toggles — default true (hide everything) since 0.5.0
+    // Flip to false to opt back in. Per-device override wins in either direction.
+    "disableHumiditySensor": true,
+    "disableOutdoorTempSensor": true,
+    "disablePowerSensor": true,
+    "disableBeeperSwitch": true,
+    "disableDisplaySwitch": true,
+    "disableDryMode": true,
+    "disableFanOnlyMode": true,
 
     "devices": [
       {
@@ -256,14 +257,16 @@ The `@2colors/esphome-native-api` exposes ESPHome's protobuf API. Climate entiti
         "host": "192.168.1.120",
         "port": 6053,                   // optional; default 6053
         "encryptionKey": "",            // optional; ESPHome `api: encryption` Noise key
-        "disableHumiditySensor": true   // optional per-device override (e.g. AC has no humidity probe)
+        "disableBeeperSwitch": false    // per-device override — enables a service the platform hid
       }
     ]
   }]
 }
 ```
 
-Per-device disable flags override the platform-wide flag — each is checked via `device[key] || platform[key]`. The platform-wide flag turns the service off for every device; the per-device flag turns it off for just that one. There's no way to enable a service that's globally disabled.
+Per-device disable flags override the platform-wide flag **in either direction**. If a per-device flag is set explicitly (true OR false), it wins; otherwise the device inherits the platform default. This is what `lib/DeviceAccessory.js settingDisabled(key)` implements: `device[key] !== undefined ? Boolean(device[key]) : Boolean(platform[key])`. Since 0.5.0 the platform defaults are all `true` (everything hidden), so the symmetric override is the only way to opt a single AC back into a service.
+
+Heads-up about `autoDiscover`: when it's on and discovers a device, the device is registered with a stable UUID and cached on disk. When it's later turned **off**, the next `init()` builds `liveHosts` from manual `devices[]` only, so any auto-discovered host that isn't also in `devices[]` is no longer "live" and `pruneOrphanedAccessories(platform, liveHosts)` unregisters it. **To preserve auto-discovered devices when disabling discovery, copy them into `devices[]` first.**
 
 When `autoDiscover` is on, discovered devices that aren't in `devices[]` get a name derived from the mDNS hostname (e.g. `air-conditioner-fae810` → `Air Conditioner Fae810`); rename them in HomeKit if you want a friendlier label. Encrypted ESPHome devices (`api: encryption: key:`) need a manual `devices[]` entry — the Noise key isn't broadcast over mDNS.
 

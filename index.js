@@ -15,16 +15,20 @@ class SLWFOnePro {
 		this.name = config.name || PLATFORM_NAME;
 		this.devices = config.devices || [];
 		this.debug = config.debug || false;
-		this.autoDiscover = config.autoDiscover || false;
+		// Defaults intentionally favour a clean Apple Home install: just the AC tile
+		// shows up, with mDNS auto-discovery already on. Power users opt into the
+		// extras (humidity / outdoor temp / power / beeper / display / DRY / FAN_ONLY)
+		// either globally by flipping the platform flag or per-device.
+		this.autoDiscover = config.autoDiscover ?? true;
 		this.discoveryTimeout = config.discoveryTimeout || undefined;
 
-		this.disableHumiditySensor = config.disableHumiditySensor || false;
-		this.disableOutdoorTempSensor = config.disableOutdoorTempSensor || false;
-		this.disableBeeperSwitch = config.disableBeeperSwitch || false;
-		this.disableDisplaySwitch = config.disableDisplaySwitch || false;
-		this.disableDryMode = config.disableDryMode || false;
-		this.disableFanOnlyMode = config.disableFanOnlyMode || false;
-		this.disablePowerSensor = config.disablePowerSensor || false;
+		this.disableHumiditySensor = config.disableHumiditySensor ?? true;
+		this.disableOutdoorTempSensor = config.disableOutdoorTempSensor ?? true;
+		this.disableBeeperSwitch = config.disableBeeperSwitch ?? true;
+		this.disableDisplaySwitch = config.disableDisplaySwitch ?? true;
+		this.disableDryMode = config.disableDryMode ?? true;
+		this.disableFanOnlyMode = config.disableFanOnlyMode ?? true;
+		this.disablePowerSensor = config.disablePowerSensor ?? true;
 
 		this.log.easyDebug = (...content) => {
 			const message = content.map(part => (typeof part === 'string' ? part : JSON.stringify(part))).join(' ');

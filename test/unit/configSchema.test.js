@@ -131,19 +131,29 @@ describe('config.schema.json', () => {
 		expect(cond.functionBody).toContain('autoDiscover');
 	});
 
-	test('all boolean disable flags default to false', () => {
+	test('platform-level disable flags default to true (clean Apple Home install)', () => {
 		const props = schema.schema.properties;
 		const flags = Object.keys(props).filter(k => k.startsWith('disable'));
 		for (const flag of flags) {
 			expect(props[flag].type).toBe('boolean');
-			expect(props[flag].default).toBe(false);
+			expect(props[flag].default).toBe(true);
 		}
-		const deviceProps = props.devices.items.properties;
+	});
+
+	test('per-device disable flags have no default — undefined falls through to platform', () => {
+		// Per-device flags must remain undefined unless explicitly set by the user; if the
+		// schema set default:false here, the UI would write false to every saved device
+		// config and override the platform default, defeating the symmetric override.
+		const deviceProps = schema.schema.properties.devices.items.properties;
 		const deviceFlags = Object.keys(deviceProps).filter(k => k.startsWith('disable'));
 		for (const flag of deviceFlags) {
 			expect(deviceProps[flag].type).toBe('boolean');
-			expect(deviceProps[flag].default).toBe(false);
+			expect(deviceProps[flag].default).toBeUndefined();
 		}
+	});
+
+	test('autoDiscover defaults to true so fresh installs pick up devices automatically', () => {
+		expect(schema.schema.properties.autoDiscover.default).toBe(true);
 	});
 
 	test('default `name` matches the platform identifier so new UI installs label themselves correctly', () => {

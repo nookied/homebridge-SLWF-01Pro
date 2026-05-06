@@ -20,9 +20,9 @@
       },
       "autoDiscover": {
         "title": "Auto-discover SLWF-01Pro devices via mDNS",
-        "description": "Browses the local network for ESPHome `_esphomelib._tcp` services and adds any device that exposes a Climate entity. Only works for unencrypted devices. Manually configured devices in the list below take precedence and are required for any device with the ESPHome API encryption key set.",
+        "description": "Browses the local network for ESPHome `_esphomelib._tcp` services and adds any device that exposes a Climate entity. Only works for unencrypted devices. Manually configured devices in the list below take precedence and are required for any device with the ESPHome API encryption key set. Note: turning this off after it has run will *unregister* any device that wasn't also added to the list below — copy your discovered devices into the list before disabling.",
         "type": "boolean",
-        "default": false
+        "default": true
       },
       "discoveryTimeout": {
         "title": "Discovery timeout (seconds)",
@@ -35,37 +35,37 @@
       "disableHumiditySensor": {
         "title": "Hide Humidity sensor service (for ACs without a real humidity probe)",
         "type": "boolean",
-        "default": false
+        "default": true
       },
       "disableOutdoorTempSensor": {
         "title": "Hide Outdoor Temperature sensor service",
         "type": "boolean",
-        "default": false
+        "default": true
       },
       "disablePowerSensor": {
         "title": "Hide Power Usage characteristic (Eve.Energy)",
         "type": "boolean",
-        "default": false
+        "default": true
       },
       "disableBeeperSwitch": {
         "title": "Hide Beeper switch",
         "type": "boolean",
-        "default": false
+        "default": true
       },
       "disableDisplaySwitch": {
         "title": "Hide Display Toggle switch",
         "type": "boolean",
-        "default": false
+        "default": true
       },
       "disableDryMode": {
         "title": "Hide DRY mode switch",
         "type": "boolean",
-        "default": false
+        "default": true
       },
       "disableFanOnlyMode": {
         "title": "Hide FAN_ONLY mode switch",
         "type": "boolean",
-        "default": false
+        "default": true
       },
       "devices": {
         "type": "array",
@@ -98,39 +98,32 @@
               "type": "string"
             },
             "disableHumiditySensor": {
-              "title": "Hide Humidity sensor for this device",
-              "type": "boolean",
-              "default": false
+              "title": "Hide Humidity sensor for this device (overrides platform default)",
+              "type": "boolean"
             },
             "disableOutdoorTempSensor": {
-              "title": "Hide Outdoor Temperature for this device",
-              "type": "boolean",
-              "default": false
+              "title": "Hide Outdoor Temperature for this device (overrides platform default)",
+              "type": "boolean"
             },
             "disablePowerSensor": {
-              "title": "Hide Power Usage for this device",
-              "type": "boolean",
-              "default": false
+              "title": "Hide Power Usage for this device (overrides platform default)",
+              "type": "boolean"
             },
             "disableBeeperSwitch": {
-              "title": "Hide Beeper switch for this device",
-              "type": "boolean",
-              "default": false
+              "title": "Hide Beeper switch for this device (overrides platform default)",
+              "type": "boolean"
             },
             "disableDisplaySwitch": {
-              "title": "Hide Display Toggle for this device",
-              "type": "boolean",
-              "default": false
+              "title": "Hide Display Toggle for this device (overrides platform default)",
+              "type": "boolean"
             },
             "disableDryMode": {
-              "title": "Hide DRY mode switch for this device",
-              "type": "boolean",
-              "default": false
+              "title": "Hide DRY mode switch for this device (overrides platform default)",
+              "type": "boolean"
             },
             "disableFanOnlyMode": {
-              "title": "Hide FAN_ONLY mode switch for this device",
-              "type": "boolean",
-              "default": false
+              "title": "Hide FAN_ONLY mode switch for this device (overrides platform default)",
+              "type": "boolean"
             }
           }
         }
