@@ -13,10 +13,10 @@ This file is the canonical persistent memory for this project. Any assistant/age
 **Repo:** [`https://github.com/nookied/homebridge-SLWF-01Pro`](https://github.com/nookied/homebridge-SLWF-01Pro) — **maintained fork**
 **Original (upstream):** [`nitaybz/homebridge-esphome-ac`](https://github.com/nitaybz/homebridge-esphome-ac) — last release 0.0.4. The `upstream` git remote was deliberately removed in v0.2.0; the fork is fully independent.
 **License:** MIT (preserved from original)
-**Current version:** **0.4.3** — published on npm with provenance. 130 unit tests passing. CI on Node 18.20.4 / 20.15.1 / 22.x / 24.x. Tag-driven release pipeline.
+**Current version:** **0.4.3** — published on npm with provenance. 130 unit tests passing. CI on Node 18.20.4 / 20.15.1 / 22.x / 24.x. Tag-driven release pipeline. Local unreleased work after 0.4.3 moves Eve power monitoring to a linked Outlet service, bumps the accessory schema to 5, and has 132 unit tests passing locally.
 **Engines:** Homebridge `^1.8.0 || ^2.0.0`; Node `^18.20.4 || ^20.15.1 || ^22.0.0 || ^24.0.0`
 
-> **⚠️ Open issue at the time of this writing — see [HANDOFF.md](HANDOFF.md):** Apple Home pairing of the SLWF child bridge intermittently fails ("Connecting…" hangs OR "non-compliant" / accessories invisible). Plugin code is HAP-best-practice clean (130 tests verify); leading hypothesis is service count per accessory exceeding Apple Home iOS 17+ tolerance, OR the Eve.Energy custom characteristic on a standard service. Test path: bare-bones config (all `disable*` flags `true`) before re-enabling services one at a time.
+> **⚠️ Open issue at the time of this writing — see [HANDOFF.md](HANDOFF.md):** Apple Home pairing of the SLWF child bridge intermittently fails ("Connecting…" hangs OR "non-compliant" / accessories invisible). Plugin code is HAP-best-practice clean (130 tests verify in 0.4.3); local unreleased work removes the Eve.Energy custom characteristic from the standard HeaterCooler service. Remaining leading hypotheses: service count per accessory exceeding Apple Home iOS 17+ tolerance, stale bridge HAP pairing state, or network reachability of the child bridge port. Test path: bare-bones config (all `disable*` flags `true`) before re-enabling services one at a time.
 
 ### What "SLWF-01Pro" is
 
@@ -80,12 +80,12 @@ homebridge-SLWF-01Pro/
 │   │   ├── constructor({device, deviceInfo, entities, platform})
 │   │   ├── setupAccessoryInformation()         Manufacturer/Model/SerialNumber/FirmwareRevision
 │   │   ├── addClimateService()                 Service.HeaterCooler with all primary mode characteristics
-│   │   ├── addOptionalSensorServices()         HumiditySensor / TemperatureSensor (outdoor) / Eve.Energy power
+│   │   ├── addOptionalSensorServices()         HumiditySensor / TemperatureSensor (outdoor) / linked Outlet for Eve.Energy power
 │   │   ├── addOptionalSwitchServices()         Service.Switch for Beeper + Display Toggle
 │   │   ├── addModeSwitchServices()             Service.Switch for DRY + FAN_ONLY (mutually exclusive with primary mode)
 │   │   ├── removeDisabledServices()            Honour disable* flags AND missing entities (cached cleanup)
 │   │   ├── attachOptionalEntityListeners()     Bind ESPHome 'state' events for sensors / switches / power
-│   │   ├── attachPowerCharacteristic()         Eve.Energy CurrentPowerConsumption + optional fakegato-history
+│   │   ├── attachPowerService()                Linked Outlet service with Eve.Energy CurrentPowerConsumption + optional fakegato-history
 │   │   ├── handleModeSwitch(targetMode, on)    DRY/FAN_ONLY toggle handler — sets/restores mode via stateManager.sendState
 │   │   ├── syncModeSwitches(currentMode)       Reflect device's actual mode back into the supplementary switches
 │   │   ├── setConnectedStatus(connected)       Push StatusActive + StatusFault to climate service
@@ -119,7 +119,7 @@ homebridge-SLWF-01Pro/
 │   │
 │   └── constants.js                      Single source of truth for plugin-wide constants
 │       ├── PLUGIN_NAME / PLATFORM_NAME         npm + Homebridge identifiers
-│       ├── ACCESSORY_SCHEMA_VERSION            Bumped on accessory-shape changes (currently 4)
+│       ├── ACCESSORY_SCHEMA_VERSION            Bumped on accessory-shape changes (currently 5)
 │       └── UUID_NAMESPACE                      Prefix for the HomeKit UUID hash
 │
 ├── test/
@@ -130,8 +130,8 @@ homebridge-SLWF-01Pro/
 │       ├── configSchema.test.js          Structural schema audit + drift checks vs. lib/constants.js (13 tests)
 │       ├── configSchemaValidation.test.js  ajv-based config-schema validation (20 tests)
 │       └── hapCompliance.test.js         Mock HAP shim: AccessoryCategory, setPrimaryService, addLinkedService,
-│                                            ConfiguredName, Identify handler, NaN-safe setProps,
-│                                            RotationSpeed.minStep, schema-version single-sourcing (10 tests)
+│                                            ConfiguredName, Identify handler, NaN-safe setProps, Eve power Outlet isolation,
+│                                            RotationSpeed.minStep, schema-version single-sourcing
 │
 ├── .github/workflows/
 │   ├── ci.yml                            Lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x, every push + PR
@@ -168,20 +168,20 @@ homebridge-SLWF-01Pro/
      - If no climate entity, log + skip. Otherwise instantiate `new DeviceAccessory({ device, deviceInfo, entities: bundle, platform })` and store in `platform.esphomeDevices[device.host]`.
    - `pruneOrphanedAccessories(platform, liveHosts)` — unregister any cached accessory whose `context.host` is not in the live device list.
 5. `DeviceAccessory` constructor:
-   - Computes `UUID = api.hap.uuid.generate(entities.climate.config.uniqueId)` — keeps the same UUID derivation as v0.0.4 so existing cached accessories still match.
+   - Computes `UUID = api.hap.uuid.generate(UUID_NAMESPACE + ':' + deriveDeviceId(...))` so this fork never collides with upstream for the same physical AC.
    - Looks up cached accessory by UUID; if found, reuse it (refresh `context.host`). If not, `new api.platformAccessory(name, uuid)` → `api.registerPlatformAccessories`.
-   - Calls `setupAccessoryInformation()` → `addClimateService()` → `addOptionalSensorServices()` → `addOptionalSwitchServices()` → `addModeSwitchServices()` → `removeDisabledServices()` → `attachOptionalEntityListeners()`.
+   - Calls `setupAccessoryInformation()` → `addClimateService()` → `removeLegacyPowerCharacteristic()` → `addOptionalSensorServices()` → `addOptionalSwitchServices()` → `addModeSwitchServices()` → `removeDisabledServices()` → `linkOptionalServices()` → `attachOptionalEntityListeners()`.
    - `removeDisabledServices` is idempotent — both "disabled by config flag" and "missing entity on device" trigger removal.
 6. **Writes** (HomeKit → ESPHome):
    - HomeKit `.onSet(handler)` → `stateManager.set.<X>` mutates `that.state.<field>` and calls `sendState(that)`.
-   - `sendState` debounces 600 ms per-device (`that._sendTimeout`), then calls `that.esphome.connection.climateCommandService(that.state)`.
+   - `sendState` debounces 600 ms per-device (`that._sendTimeout`), then sends a clean `climateCommandService(payload)` containing only dirty command fields plus the ESPHome entity key.
    - Pending callers all resolve when the send completes; if `that.connected === false`, all reject with `HapStatusError(-70402)` (SERVICE_COMMUNICATION_FAILURE).
    - **Mode-switch handlers** (DRY/FAN_ONLY) call `stateManager.sendState(this)` directly after mutating `state.mode` (no debounce skip — each toggle queues its own send).
    - **Beeper switch** calls `entity.setState(true/false)` directly via the @2colors Switch entity API.
    - **Display button** calls `entity.push()` directly via the Button entity API; service auto-resets to off 250 ms later.
 7. **State pushes** (ESPHome → HomeKit):
    - `entities.climate.on('state', updateClimateState)` — main path. Updates Active / CurrentTemperature / Target/CurrentHeaterCoolerState / SwingMode / RotationSpeed and `syncModeSwitches()` for DRY/FAN_ONLY tile state.
-   - Each optional entity (`humiditySensor`, `outdoorTempSensor`, `powerSensor`, `beeperSwitch`) has its own `'state'` listener pushing to its respective characteristic.
+   - Each optional entity (`humiditySensor`, `outdoorTempSensor`, `powerSensor`, `beeperSwitch`) has its own `'state'` listener pushing to its respective service/characteristic. Power updates the linked Outlet's Eve `CurrentPowerConsumption` and `OutletInUse`.
    - On disconnect, `setConnectedStatus(false)` flips StatusFault to GENERAL_FAULT (red badge in HomeKit) and StatusActive to false. Reconnect → reverts.
 8. **Cleanup at startup**: After spawning all clients, `pruneOrphanedAccessories` unregisters any cached accessory whose `context.host` is not in the current live host list.
 
@@ -294,7 +294,7 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 ## Known issues / tech debt
 
 ### Open — immediate priority
-1. **🔴 Apple Home pairing intermittently fails** — see [HANDOFF.md](HANDOFF.md). User reports either (a) "Connecting…" spinner that hangs indefinitely, or (b) bridge pairs but is "non-compliant" / accessories invisible. The plugin code is HAP-best-practice-clean as of 0.4.3 (130 tests verify category, primary service, linked services, ConfiguredName, Identify handler, NaN-safe setProps). Leading hypotheses: too many secondary services per accessory (8) for Apple Home iOS 17+; OR Eve.Energy `CurrentPowerConsumption` custom characteristic on the standard `HeaterCooler` service. Untested: bare-bones config with all `disable*` flags `true` to rule out service-count; refactor of Eve.Energy to a dedicated `Service.Outlet`.
+1. **🔴 Apple Home pairing intermittently fails** — see [HANDOFF.md](HANDOFF.md). User reports either (a) "Connecting…" spinner that hangs indefinitely, or (b) bridge pairs but is "non-compliant" / accessories invisible. The plugin code is HAP-best-practice-clean as of 0.4.3 (130 tests verify category, primary service, linked services, ConfiguredName, Identify handler, NaN-safe setProps). Local unreleased work removes one suspected trigger by moving Eve.Energy `CurrentPowerConsumption` from the standard `HeaterCooler` service to a linked `Service.Outlet`, with schema version 5 forcing clean accessory recreation. Remaining hypotheses: too many secondary services per accessory for Apple Home iOS 17+, stale bridge HAP state, or child-bridge TCP reachability.
 
 ### Open — feature gaps
 2. **Custom fan modes (`silent`, `turbo`) and presets (`eco`, `boost`, `sleep`, `away`) are not exposed.** Midea-platform devices commonly advertise these via `supportedCustomFanModesList`/`supportedPresetsList`. Roadmap M4.
@@ -318,6 +318,7 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 - **Config UI "validation failed" warning** *(0.3.2/0.3.3)*. `config.schema.json` modernized to canonical JSON Schema (`required: [...]` arrays at parent level, no per-property `required: false`). ajv-based test suite with 20 sample configs.
 - **`Categories.AIR_CONDITIONER` was never set on accessories** *(0.4.1)*. Defaulting to `OTHER (1)` could cause Apple Home iOS 16+ to silently hide accessories. Companion services (sensors + switches) are now `addLinkedService`-linked to the primary HeaterCooler.
 - **HAP-compliance audit fixes** *(0.4.3)*. `setProps NaN`-guard with default visual temp bounds; mode-fallthrough uses `validValues[0]` instead of hardcoded AUTO; `ConfiguredName` on every companion service; `Identify` handler bound; `RotationSpeed.minStep` sized to fan-mode count; `ACCESSORY_SCHEMA_VERSION` consolidated to `lib/constants.js` (single source). Mock-HAP-shim test suite (`test/unit/hapCompliance.test.js`, 9 tests) prevents regression.
+- **Eve power characteristic attached directly to HeaterCooler** *(unreleased)*. Power monitoring now uses a linked `Service.Outlet` named `<AC> Power`; startup also removes the legacy Eve characteristic from cached HeaterCooler services. `ACCESSORY_SCHEMA_VERSION` is bumped to 5 so users get the corrected service shape on upgrade.
 
 ### By design (won't fix)
 - **No upstream PR-back.** The fork is intentionally divergent and the upstream's release cadence (last release ~2 years ago) doesn't justify the round-trip.

@@ -10,14 +10,15 @@
 const fs = require('fs');
 const path = require('path');
 const DeviceAccessory = require('../../lib/DeviceAccessory');
+const { EVE_POWER_UUID } = require('../../lib/eve');
 
 // --- Fakes ---------------------------------------------------------------
 
 class FakeCharacteristic {
-	constructor(displayName, uuid) {
+	constructor(displayName, uuid, props = {}) {
 		this.displayName = displayName;
 		this.UUID = uuid;
-		this.props = {};
+		this.props = { ...props };
 		this.value = null;
 		this._handlers = {};
 	}
@@ -39,7 +40,11 @@ function makeCharCtor(name, uuid) {
 	return C;
 }
 
-const Characteristic = {
+class CharacteristicBase extends FakeCharacteristic {}
+CharacteristicBase.Formats = { FLOAT: 'float' };
+CharacteristicBase.Perms = { READ: 'pr', WRITE: 'pw', NOTIFY: 'ev' };
+
+const Characteristic = Object.assign(CharacteristicBase, {
 	Manufacturer: makeCharCtor('Manufacturer', '00000020-0000-1000-8000-0026BB765291'),
 	Model: makeCharCtor('Model', '00000021-0000-1000-8000-0026BB765291'),
 	SerialNumber: makeCharCtor('SerialNumber', '00000030-0000-1000-8000-0026BB765291'),
@@ -65,7 +70,8 @@ const Characteristic = {
 		NO_FAULT: 0, GENERAL_FAULT: 1,
 	}),
 	CurrentRelativeHumidity: makeCharCtor('CurrentRelativeHumidity', '00000010-0000-1000-8000-0026BB765291'),
-};
+	OutletInUse: makeCharCtor('OutletInUse', '00000026-0000-1000-8000-0026BB765291'),
+});
 
 class FakeService {
 	constructor(displayName, uuid, subtype) {
@@ -88,6 +94,14 @@ class FakeService {
 	}
 	addOptionalCharacteristic(charCtor) {
 		this._addedOptional.add(charCtor.UUID);
+	}
+	addCharacteristic(input) {
+		const characteristic = typeof input === 'function' ? new input() : input;
+		this.characteristics.set(characteristic.UUID, characteristic);
+		return characteristic;
+	}
+	removeCharacteristic(characteristic) {
+		if (characteristic) this.characteristics.delete(characteristic.UUID);
 	}
 	setCharacteristic(charCtor, value) {
 		this.getCharacteristic(charCtor).updateValue(value);
@@ -116,6 +130,7 @@ const Service = {
 	HeaterCooler: makeSvcCtor('HeaterCooler', '000000BC-0000-1000-8000-0026BB765291'),
 	HumiditySensor: makeSvcCtor('HumiditySensor', '00000082-0000-1000-8000-0026BB765291'),
 	TemperatureSensor: makeSvcCtor('TemperatureSensor', '0000008A-0000-1000-8000-0026BB765291'),
+	Outlet: makeSvcCtor('Outlet', '00000047-0000-1000-8000-0026BB765291'),
 	Switch: makeSvcCtor('Switch', '00000049-0000-1000-8000-0026BB765291'),
 };
 
@@ -269,6 +284,55 @@ describe('HAP-compliance: addLinkedService', () => {
 		const linkedTypes = heaterCooler.linkedServices.map(s => s.UUID);
 		expect(linkedTypes).toContain(Service.HumiditySensor.UUID);
 		expect(linkedTypes).toContain(Service.Switch.UUID);
+	});
+});
+
+describe('HAP-compliance: Eve power service isolation', () => {
+	test('power consumption is attached to a linked Outlet service, not HeaterCooler', () => {
+		const platform = makeFakePlatform();
+		platform.api.registerPlatformAccessories = () => {};
+		const climate = makeFakeClimateEntity();
+		const powerSensor = { type: 'Sensor', name: 'Power', config: { name: 'Power', objectId: 'power' }, state: { state: 42 }, on: () => {} };
+		new DeviceAccessory({
+			device: { name: 'AC', host: '192.168.1.10' },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			entities: { climate, powerSensor },
+			platform,
+		});
+		const acc = platform.accessories[0];
+		const heaterCooler = acc.getService(Service.HeaterCooler);
+		const power = acc.getServiceById(Service.Outlet, 'power');
+		const EvePower = makeCharCtor('Current Consumption', EVE_POWER_UUID);
+
+		expect(power).toBeDefined();
+		expect(power.testCharacteristic(EvePower)).toBe(true);
+		expect(heaterCooler.testCharacteristic(EvePower)).toBe(false);
+		expect(heaterCooler.linkedServices).toContain(power);
+		expect(power.getCharacteristic(EvePower).value).toBe(42);
+	});
+
+	test('legacy Eve power characteristic is removed from cached HeaterCooler service', () => {
+		const platform = makeFakePlatform();
+		platform.api.registerPlatformAccessories = () => {};
+		const climate = makeFakeClimateEntity();
+		const powerSensor = { type: 'Sensor', name: 'Power', config: { name: 'Power', objectId: 'power' }, state: { state: 42 }, on: () => {} };
+		const uuid = platform.api.hap.uuid.generate('homebridge-slwf-01pro:air_conditioner-fae810');
+		const cached = new platform.api.platformAccessory('AC', uuid, Categories.AIR_CONDITIONER);
+		cached.context.schemaVersion = 5;
+		const heaterCooler = cached.addService(Service.HeaterCooler, 'AC');
+		const LegacyPower = makeCharCtor('Current Consumption', EVE_POWER_UUID);
+		heaterCooler.getCharacteristic(LegacyPower).updateValue(13);
+		platform.accessories.push(cached);
+
+		new DeviceAccessory({
+			device: { name: 'AC', host: '192.168.1.10' },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			entities: { climate, powerSensor },
+			platform,
+		});
+
+		expect(heaterCooler.testCharacteristic(LegacyPower)).toBe(false);
+		expect(cached.getServiceById(Service.Outlet, 'power')).toBeDefined();
 	});
 });
 

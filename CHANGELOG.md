@@ -7,6 +7,21 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **Moved Eve power monitoring off the standard `HeaterCooler` service.** `CurrentPowerConsumption` now lives on a linked `Service.Outlet` named `<AC> Power` instead of being added as a custom characteristic directly to the AC's primary HeaterCooler service. This keeps the primary service shape closer to HomeKit's standard HeaterCooler definition and removes one suspected Apple Home pairing/non-compliance trigger.
+- **Cached legacy Eve power characteristics are removed from HeaterCooler.** `ACCESSORY_SCHEMA_VERSION` is bumped to 5 so existing accessories are evicted and rebuilt cleanly on upgrade; the runtime also removes the legacy characteristic defensively if encountered.
+- **Power service state is more explicit.** The linked Outlet stays logically on, reports `OutletInUse` based on positive power draw, and continues to feed `fakegato-history` entries when available.
+- **Target-temperature clamping now uses default visual bounds** when ESPHome omits `visualMinTemperature` / `visualMaxTemperature`, matching the safe bounds already used for HAP `setProps`.
+
+### Internal
+
+- Added HAP regression tests proving Eve power is attached to a linked Outlet service, not HeaterCooler, and that stale HeaterCooler power characteristics are removed from cached accessories.
+
+---
+
 ## [0.4.3] — 2026-05-06
 
 (Tag `v0.4.2` exists but was never published — its release workflow failed at the lint step on a leftover unused-import in the new test file. `0.4.3` is the same content + that lint fix.)

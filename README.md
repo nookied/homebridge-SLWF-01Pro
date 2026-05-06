@@ -100,7 +100,7 @@ You can mix both — listed devices in `devices[]` take precedence; auto-discove
 | `discoveryTimeout` | no | `5` | Seconds to wait for mDNS responses before continuing. |
 | `disableHumiditySensor` | no | `false` | Hide the HumiditySensor service for **every** device (e.g. ACs that report a fake `0 %` because no probe is fitted). |
 | `disableOutdoorTempSensor` | no | `false` | Hide the outdoor TemperatureSensor service. |
-| `disablePowerSensor` | no | `false` | Hide the Eve.Energy CurrentPowerConsumption characteristic. |
+| `disablePowerSensor` | no | `false` | Hide the linked Outlet service carrying Eve.Energy CurrentPowerConsumption. |
 | `disableBeeperSwitch` | no | `false` | Hide the Beeper Switch service. |
 | `disableDisplaySwitch` | no | `false` | Hide the Display Toggle Switch service. |
 | `disableDryMode` | no | `false` | Hide the DRY mode Switch service. |
@@ -144,7 +144,7 @@ Per ESPHome device, all of these services land on a single HomeKit accessory if 
 | `Service.HeaterCooler` (mandatory) | `Climate` entity | — |
 | `Service.HumiditySensor` | Sensor matching `*humidity*` | `disableHumiditySensor` |
 | `Service.TemperatureSensor` (outdoor) | Sensor matching `*outdoor*temp*` | `disableOutdoorTempSensor` |
-| Eve.Energy `CurrentPowerConsumption` (W) on the AC accessory | Sensor matching `*power*` | `disablePowerSensor` |
+| `Service.Outlet` "Power" with Eve.Energy `CurrentPowerConsumption` (W) | Sensor matching `*power*` | `disablePowerSensor` |
 | `Service.Switch` "Beeper" | Switch matching `*beeper*` | `disableBeeperSwitch` |
 | `Service.Switch` "Display" | Button matching `*display*` (auto-resets after press) | `disableDisplaySwitch` |
 | `Service.Switch` "Dry" | Climate device's `DRY` mode | `disableDryMode` |
@@ -152,6 +152,8 @@ Per ESPHome device, all of these services land on a single HomeKit accessory if 
 | `StatusActive` + `StatusFault` (on the climate service) | Mirrors ESPHome client connect/disconnect | — (always on) |
 
 Entities the plugin deliberately ignores: Wi-Fi RSSI, Uptime, Factory Reset (dangerous to expose).
+
+Power monitoring is intentionally isolated in a linked Outlet service rather than attached directly to the HeaterCooler service. This keeps the primary AC service limited to standard HeaterCooler characteristics, which is friendlier to Apple Home during bridge pairing while still allowing Eve-compatible clients to read consumption.
 
 ## Behaviour
 
