@@ -7,6 +7,18 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [0.5.2] — 2026-05-06
+
+### Fixed
+
+- **Phantom "Skipping device without host" warnings on every restart.** The Homebridge UI form, under the 0.4.x schema that defaulted every per-device `disable*` flag to `false`, would persist empty device rows containing those defaults whenever a user opened the Settings page without filling in a row. The plugin then logged each such row as `error` on every restart (e.g. 68 noise lines in a real user log). Empty form-template rows (no `host`, no `name`, no `encryptionKey`) are now silently dropped. Real misconfigurations — a named device or one with an encryption key but no host — still log a `warn` (downgraded from `error`).
+
+### Internal
+
+- New `lib/esphome.js looksLikeRealEntry(device)` helper distinguishes form scaffolding from genuine misconfigurations; covered by `test/unit/looksLikeRealEntry.test.js` (5 tests). 149 tests total.
+
+---
+
 ## [0.5.1] — 2026-05-06
 
 ### Fixed
