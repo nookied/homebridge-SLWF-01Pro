@@ -20,17 +20,20 @@ Budget: ~10 minutes per release.
 ## 1. Install on the Homebridge host
 
 ```bash
-# From a local checkout (preferred for fork pre-release testing)
-sudo npm install -g <path-to-checkout>
+# Latest published from npm (preferred)
+sudo npm install -g homebridge-slwf-01pro@<version>
 
-# Or pin to a specific commit:
+# Or pin to a specific commit (pre-publish testing):
 sudo npm install -g github:nookied/homebridge-SLWF-01Pro#<sha>
+
+# Or from a local checkout:
+sudo npm install -g <path-to-checkout>
 
 sudo systemctl restart homebridge   # or: hb-service restart
 sudo journalctl -u homebridge -f --since '1 minute ago'
 ```
 
-- [ ] No errors during plugin load (`Loaded plugin: homebridge-esphome-ac@<version>`)
+- [ ] No errors during plugin load (`Loaded plugin: homebridge-slwf-01pro@<version>`)
 - [ ] One `<name> client connected` line per configured/discovered device
 - [ ] One `Initialized "<name>" with N mapped entit(y|ies)` line per device with a Climate entity
 - [ ] No `TypeError`, `ReferenceError`, unhandled promise rejection

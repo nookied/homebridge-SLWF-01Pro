@@ -37,10 +37,10 @@ ESPHome's **custom fan modes** (`silent`, `turbo` on Midea) and **presets** (`ec
 ## Install
 
 ```bash
-sudo npm install -g homebridge-esphome-ac
+sudo npm install -g homebridge-slwf-01pro
 ```
 
-Or from the Homebridge UI: search for **homebridge-esphome-ac** in the plugin browser. *(Package will be republished under a fork-specific npm name once the rewrite stabilises — see [ROADMAP.md](ROADMAP.md).)*
+Or from the Homebridge UI: search for **homebridge-slwf-01pro** in the plugin browser.
 
 To install straight from git instead of npm (e.g. to pin a specific commit):
 
@@ -187,13 +187,14 @@ If the device advertises any swing mode beyond OFF, a HomeKit Swing toggle is ex
 If you're moving from the upstream `homebridge-esphome-ac`:
 
 ```bash
-# No config changes needed — the platform identifier is the same
 sudo npm uninstall -g homebridge-esphome-ac
-sudo npm install -g github:nookied/homebridge-SLWF-01Pro
+sudo npm install -g homebridge-slwf-01pro
 sudo systemctl restart homebridge   # or: hb-service restart
 ```
 
-**Your `config.json` does not need changes.** The platform identifier (`"platform": "ESPHomeAC"`) is unchanged for compatibility.
+**Your `config.json` does not need changes.** The platform identifier (`"platform": "ESPHomeAC"`) is unchanged for compatibility — only the npm package name differs.
+
+If accessories appear duplicated after the migration, clear Homebridge's cached accessories from the UI (Settings → Remove Single Cached Accessory) for the orphaned ones from the old plugin. The new plugin will re-pair them automatically on the next restart with stable UUIDs derived from each device's ESPHome `entity.config.uniqueId`.
 
 ## Known SLWF-01Pro quirks
 
@@ -259,7 +260,7 @@ gh release create v0.1.0 --notes-from-tag      # GitHub Release from tag message
 
 ## Credits
 
-- **[nitaybz](https://github.com/nitaybz)** — original `homebridge-esphome-ac` plugin (2023), the basis for this fork.
+- **[nitaybz](https://github.com/nitaybz)** — original `homebridge-esphome-ac` plugin (2020), the basis for this fork.
 - **[smartlight.me](https://smartlight.me)** — designs and ships the SLWF-01Pro hardware + ESPHome firmware.
 - **[ESPHome](https://esphome.io)** — the firmware and native-API protocol the plugin speaks.
 - **[@2colors/esphome-native-api](https://github.com/2colors/esphome-native-api)** — Node.js client for the ESPHome native API.

@@ -6,7 +6,7 @@ This file is the canonical persistent memory for this project. Any assistant/age
 
 ## Project Overview
 
-**npm name:** `homebridge-esphome-ac` *(inherited from upstream; will be renamed to `homebridge-slwf-01pro` once the rewrite stabilises — see ROADMAP M2)*
+**npm name:** `homebridge-slwf-01pro` *(renamed from upstream's `homebridge-esphome-ac` to avoid collision; the platform identifier in users' `config.json` stays `"ESPHomeAC"` for migration compat)*
 **Type:** Homebridge plugin (Node.js, CommonJS)
 **Purpose:** Expose ESPHome climate entities — primarily the **[SMLIGHT SLWF-01Pro](https://smartlight.me/smart-home-devices/wifi-devices/wifi-dongle-air-conditioners-midea-idea-electrolux-for-home-assistant)** Wi-Fi dongle flashed with ESPHome — as HomeKit `HeaterCooler` accessories. Hardware-agnostic: any ESPHome `climate:` component (e.g. ESP32 with [`midea_ac`](https://esphome.io/components/climate/midea.html) directly soldered) is also picked up.
 **Repo:** [`https://github.com/nookied/homebridge-SLWF-01Pro`](https://github.com/nookied/homebridge-SLWF-01Pro) — **maintained fork**
@@ -30,10 +30,11 @@ Compatible AC brands (per SMLIGHT): Midea, Idea, Electrolux, Beko, Neoclima, Bos
 
 ### Fork rules
 
-- This is a **maintained fork**. The upstream (`nitaybz/homebridge-esphome-ac`) is still on npm at 0.0.4; we have not yet republished under a fork-specific npm name (deferred until the rewrite stabilises).
-- The HomeKit *platform identifier* in users' `config.json` stays `"platform": "ESPHomeAC"` for migration compatibility — even after the npm rename.
+- This is a **maintained fork published to npm under a distinct name** (`homebridge-slwf-01pro`). The upstream (`homebridge-esphome-ac`) is unaffected and still on npm at 0.0.4.
+- The HomeKit *platform identifier* in users' `config.json` stays `"platform": "ESPHomeAC"` for migration compatibility — only the npm package name differs.
 - The `upstream` git remote IS configured (`https://github.com/nitaybz/homebridge-esphome-ac.git`) — fine to fetch/cherry-pick from, but **do not push** to it; we are not contributing back.
 - `package.json` `repository.url` MUST exactly match the GitHub repo URL (`https://github.com/nookied/homebridge-SLWF-01Pro.git`). npm sigstore provenance is strict — a mismatch causes `npm publish` to fail with HTTP 422 (warmup4ie hit this once).
+- CI runs lint + tests + smoke on Node 18/20/22/24 for every push (`.github/workflows/ci.yml`). Releases are tag-driven: `npm version patch|minor|major && git push --follow-tags` triggers `release.yml`, which publishes to npm with provenance and creates a GitHub Release.
 
 ### What it does
 
@@ -132,7 +133,7 @@ homebridge-SLWF-01Pro/
 
 ## How it runs
 
-1. Homebridge calls `module.exports(api)` → `api.registerPlatform("homebridge-esphome-ac", "ESPHomeAC", ESPHomeAC, true)` (4th arg `true` = dynamic platform).
+1. Homebridge calls `module.exports(api)` → `api.registerPlatform("homebridge-slwf-01pro", "ESPHomeAC", ESPHomeAC, true)` (4th arg `true` = dynamic platform).
 2. Homebridge instantiates `ESPHomeAC(log, config, api)`. The constructor reads config (`name`, `debug`, `devices[]`, `autoDiscover`, `discoveryTimeout`, all `disable*` flags), sets up `this.accessories = []` and `this.esphomeDevices = {}` (keyed by `device.host`), then registers `api.on('didFinishLaunching', ...)`.
 3. For each accessory in Homebridge's on-disk cache, `configureAccessory(accessory)` is called synchronously — we stash it in `this.accessories[]`. Service handlers are NOT bound here.
 4. After all `configureAccessory` calls, `didFinishLaunching` fires → `await esphome.init()`:
@@ -277,9 +278,7 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 2. **Two-point target temperature is not used.** Even when `config.supportsTwoPointTargetTemperature === true`, the plugin sends only single `target_temperature`. AUTO mode in HomeKit uses both `HeatingThresholdTemperature` and `CoolingThresholdTemperature` — currently both write to the same single field. Roadmap M4.
 3. **Intake-mounted sensor inaccuracy.** Device-side issue (the SLWF-01Pro reads cold-air-blast not room temp). Mitigated by ESPHome's `midea_ac.follow_me` action — Home-Assistant-only and needs a hardware mod. Out of scope for this plugin.
 4. **Encrypted ESPHome devices skip auto-discovery.** mDNS doesn't broadcast the Noise encryption key, so encrypted devices need a manual `devices[]` entry. Documented in README.
-5. **No CI yet.** GitHub Actions workflow for lint + tests + smoke is queued for M2.
-6. **npm package not yet renamed.** Still uses upstream's `homebridge-esphome-ac` name. Renaming is gated on user testing in real households.
-7. **Heuristic entity classification.** Beeper/humidity/etc. are matched by name pattern. If a user customizes their ESPHome YAML to use unusual entity names, the entity won't be classified. Could add explicit `entityMap` config option later.
+5. **Heuristic entity classification.** Beeper/humidity/etc. are matched by name pattern. If a user customizes their ESPHome YAML to use unusual entity names, the entity won't be classified. Could add explicit `entityMap` config option later.
 
 ### Resolved (in fork v0.1.0, unreleased)
 - **Module-level `sendTimeout` shared across devices.** Multi-AC users could lose commands when changing one AC then another within 600 ms. Now a per-device `that._sendTimeout`.

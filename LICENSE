@@ -1,6 +1,7 @@
 MIT License
 
-Copyright (c) 2020 Nitay Ben Zvi
+Copyright (c) 2020 Nitay Ben Zvi (original homebridge-esphome-ac)
+Copyright (c) 2026 Karol Nowacki (homebridge-slwf-01pro fork)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

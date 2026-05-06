@@ -20,7 +20,7 @@ Everything else is incremental coverage of ESPHome features (custom fan modes, p
 
 ✅ Dynamic platform, per-device debouncing, mode-mapping refactor with HEAT_COOL handling, **mDNS auto-discovery**, **multi-entity bundling** (Climate + sensors + switches + buttons → one HomeKit accessory), **HumiditySensor + outdoor TemperatureSensor + Eve.Energy power + Beeper switch + Display switch + DRY/FAN_ONLY mode tiles**, all with per-device disable flags. `StatusActive`/`StatusFault` mirror connection state. **78 unit tests passing.** README + CLAUDE + CHANGELOG + ROADMAP + QA_TESTS + config.schema all updated.
 
-⚠️ No CI yet. Custom fan modes / presets / two-point temperature not yet exposed. Still publishes (would publish) under upstream's `homebridge-esphome-ac` npm name. Encrypted ESPHome devices skip auto-discovery (mDNS doesn't broadcast the Noise key).
+⚠️ Custom fan modes / presets / two-point temperature not yet exposed. Encrypted ESPHome devices skip auto-discovery (mDNS doesn't broadcast the Noise key).
 
 ---
 
@@ -30,10 +30,10 @@ Source: [`homebridge/verified`](https://github.com/homebridge/verified). 11 requ
 
 | # | Requirement | Met? | Action |
 |---|---|---|---|
-| 1 | Dynamic platform plugin | ✅ | Fixed in unreleased fork pass — `registerPlatform(.., true)` |
+| 1 | Dynamic platform plugin | ✅ | Fixed in 0.1.0 — `registerPlatform(.., true)` |
 | 2 | Doesn't duplicate an existing verified plugin | ✅ | Upstream `homebridge-esphome-ac` is not Verified |
-| 3 | Published to npm with source on GitHub, issues enabled | 🟡 | Source on GitHub ✓, issues enabled ✓; **fork not yet on npm under its own name** (M1) |
-| 4 | A GitHub release per new version with notes | 🟡 | Set up `release.yml` workflow in M2 |
+| 3 | Published to npm with source on GitHub, issues enabled | ✅ | npm package `homebridge-slwf-01pro` (after first publish) |
+| 4 | A GitHub release per new version with notes | ✅ | `release.yml` workflow auto-creates Releases on `v*` tags |
 | 5 | Runs on supported LTS Node versions | ✅ | `engines.node ^18.20.4 \|\| ^20.15.1 \|\| ^22.0.0 \|\| ^24.0.0` |
 | 6 | Installs successfully and doesn't start unless configured | ✅ | `devices: []` default → no clients spawned |
 | 7 | No TTY / non-standard startup parameters | ✅ | None |
@@ -79,27 +79,27 @@ Versioning policy below is pre-1.0; once stable, switch to strict [SemVer](https
 | Docs (README + CLAUDE + CHANGELOG + ROADMAP + QA_TESTS + config.schema) | Warmup-style structure | ✅ Done |
 | Manual QA on real hardware | Walk `QA_TESTS.md` end-to-end | ⏳ User-side |
 | Tag `v0.1.0` and create GitHub Release | After QA passes | ⏳ User-side |
-| Optional: rename npm package | `homebridge-slwf-01pro` once stable in 0.1.x | Deferred to M2 |
+| **npm package renamed** to `homebridge-slwf-01pro` | Renamed from upstream's `homebridge-esphome-ac`; platform identifier (`"ESPHomeAC"`) preserved for migration compat | ✅ Done |
+| **CI workflow** (`.github/workflows/ci.yml`) | Lint + tests + smoke on Node 18.20 / 20.15 / 22 / 24, every push + PR | ✅ Done |
+| **Release workflow** (`.github/workflows/release.yml`) | Tag-driven (`v*`) `npm publish --provenance` + GitHub Release; verifies tag matches `package.json` version | ✅ Done |
 
-**Total effort remaining:** real-hardware QA + tag.
+**Total effort remaining:** real-hardware QA + npm-token setup + first publish via tag.
 
 ---
 
-### ⏭️ Milestone 2 — v0.2.0 — CI + npm rename
+### ⏭️ Milestone 2 — v0.2.0 — Integration tests + Verified application prep
 
-**Goal:** automate the regression net + ship under the fork's own npm name.
+**Goal:** widen the regression net beyond pure helpers. CI + release workflows + npm rename all shipped in 0.1.0.
 
-| Item | Description | Effort | Source |
-|---|---|---|---|
-| GitHub Actions `ci.yml` | lint + test + smoke on Node 22 / 24, every push + PR | 30 min | [warmup4ie's ci.yml as reference](https://github.com/nookied/homebridge-warmup4ie-v2/blob/main/.github/workflows/ci.yml) |
-| GitHub Actions `release.yml` | Tag-driven (`v*`) `npm publish --provenance` + GitHub Release | 30 min | warmup4ie's release.yml |
-| Integration tests for `DeviceAccessory` | Fake `platform.api` HAP shim + entity stubs; assert services attached when entities present + removed when disable flags set | 2 h | — |
-| Integration tests for `stateManager` | Fake `that` + sinon-style spy on `climateCommandService`; assert per-device debounce + connected/disconnected paths | 2 h | — |
-| Rename npm package | `homebridge-slwf-01pro` (matching repo). Update README install commands. **First publish** under the new name. | 30 min | — |
-| `repository.url` provenance assertion | Already correct; verify before first publish | — | — |
-| `NPM_TOKEN` GitHub secret | Create granular access token with bypass-2FA + write on `homebridge-slwf-01pro` | 10 min | npm docs |
+| Item | Description | Effort |
+|---|---|---|
+| Integration tests for `DeviceAccessory` | Fake `platform.api` HAP shim + entity stubs; assert services attached when entities present + removed when disable flags set | 2 h |
+| Integration tests for `stateManager` | Fake `that` + spy on `climateCommandService`; assert per-device debounce + clean-payload `markDirty` flow | 2 h |
+| Integration tests for `esphome.js` orchestrator | Fake `Client` + `discovery`; assert prune-on-empty + prune-when-discovery-fails behaviour | 2 h |
+| `clientInfo` to ESPHome | Pass `clientInfo: 'homebridge-slwf-01pro/<version>'` to `new Client(...)` so device-side logs identify the plugin | 15 min |
+| Encrypted-discovery actionable error | Detect noise-auth errors during reconnect loop and surface a one-shot user-actionable message ("device requires `encryptionKey`") | 1 h |
 
-**Total effort:** ~5.5 hours. **No HomeKit-visible changes.** Ships as `0.2.0`.
+**Total effort:** ~7 hours. **No HomeKit-visible changes.** Ships as `0.2.0`.
 
 ---
 

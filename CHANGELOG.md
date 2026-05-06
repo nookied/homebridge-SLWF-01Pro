@@ -31,6 +31,8 @@ First fork release — bug fixes, full multi-entity rewrite, and a substantial f
 - **`jest` test suite (78 tests).** Covers `lib/state.js` (mode mappers, fan conversions, swing defaults, capability checks), `lib/classifyEntity.js` (entity classification + bundling), and `lib/discovery.js` (hostname formatting + dedupe). `npm test` runs them.
 - **`pickAutoMode`, `supportsCool`, `supportsHeat`** helpers in `lib/state.js` — encode the rule "AUTO and HEAT_COOL are interchangeable for HomeKit's AUTO target state".
 - **`CLAUDE.md`, `AGENTS.md`, `ROADMAP.md`, `QA_TESTS.md`, this `CHANGELOG.md`** — full warmup-style doc set covering project memory, milestone plan, manual pre-release checklist.
+- **GitHub Actions CI workflow** (`.github/workflows/ci.yml`) — lint + unit tests + smoke on Node 18.20.4, 20.15.1, 22.x, 24.x for every push and PR.
+- **GitHub Actions release workflow** (`.github/workflows/release.yml`) — tag-driven (`v*`); verifies the tag matches `package.json` version, runs lint + tests, publishes to npm with `--provenance`, extracts release notes from CHANGELOG and creates a GitHub Release.
 
 ### Fixed
 
@@ -74,6 +76,9 @@ Three independent code-review passes (general bug-hunt, HomeKit/ESPHome semantic
 - **`package.json` `funding`** block (PayPal / Patreon / Ko-fi pointing at the original author) removed; donations should not flow to a maintainer who isn't shipping the fork.
 - **`package.json` `files`** array added to scope what `npm publish` ships — prevents `test/`, `CLAUDE.md`, `ROADMAP.md`, `QA_TESTS.md`, and `.claude/` from leaking into the published tarball.
 - **`.gitignore`** replaced with a minimal Node-only ignore set; the inherited Xcode/iOS boilerplate from upstream is gone.
+- **npm package renamed** from inherited `homebridge-esphome-ac` to **`homebridge-slwf-01pro`** to avoid colliding with the upstream package on the npm registry. The Homebridge platform identifier in users' `config.json` (`"platform": "ESPHomeAC"`) is unchanged for migration compatibility — only the install command differs (`sudo npm uninstall -g homebridge-esphome-ac && sudo npm install -g homebridge-slwf-01pro`).
+- **`PLUGIN_NAME` constant in `index.js`** updated to match the new npm name. Existing users of upstream `homebridge-esphome-ac@0.0.4` will see their cached accessories re-pair on first launch (the HomeKit UUIDs are still derived from `entity.config.uniqueId` so they reattach to the same Home app tile).
+- **LICENSE** preserves the original 2020 Nitay Ben Zvi MIT copyright + adds the 2026 Karol Nowacki fork copyright.
 - **README rewritten** with SLWF-01Pro device context (hardware revisions, supported AC brands, ESPHome-specific quirks like intake-mounted sensor inaccuracy and `midea_ac.follow_me`), full configuration reference, troubleshooting, and child-bridge recommendation.
 
 ### Internal
