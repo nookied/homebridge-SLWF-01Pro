@@ -157,6 +157,8 @@ Entities the plugin deliberately ignores: Wi-Fi RSSI, Uptime, Factory Reset (dan
 
 Power monitoring is intentionally isolated in a linked, hidden Outlet service rather than attached directly to the HeaterCooler service. The Outlet doesn't render as a separate tile in Apple Home (it's marked hidden, so Home skips it), but Eve.app and other HAP-direct clients still see the service in the database and can read `CurrentPowerConsumption`. This keeps the primary AC tile limited to standard HeaterCooler characteristics, which is friendlier to Apple Home during bridge pairing.
 
+Fault reporting is deliberately conservative: brief ESPHome TCP drops get a 15-second grace period before `StatusFault` is raised, reconnects clear the fault immediately, and startup fault clears are sent as forced HAP events so Apple Home receives them even when the value was already `NO_FAULT`.
+
 ## Behaviour
 
 ### Modes
@@ -233,7 +235,7 @@ These are device-side issues, not plugin bugs — listed here so you know what t
 
 ### Apple Home "Connecting..." spinner hangs / "Out of compliance" / accessories invisible after pairing
 
-The 0.4.x intermittent pairing issue was addressed across 0.4.4 → 0.5.1 (Eve power off the standard `HeaterCooler` service, companion services hidden by default, schema-version eviction forcing a clean accessory recreation, ConfiguredName not clobbered on restart). Fresh installs from 0.5.0+ already get the bare-bones config below as the default. The original diagnostic notes are kept in [HANDOFF.md](HANDOFF.md) for reference; the workaround config below is still the right starting point if you hit a similar symptom.
+The 0.4.x intermittent pairing issue was addressed across 0.4.4 → 0.5.1 (Eve power off the standard `HeaterCooler` service, companion services hidden by default, schema-version eviction forcing a clean accessory recreation, ConfiguredName not clobbered on restart). 0.5.4/0.5.5 also hardened fault clearing for Homebridge v2 / newer Apple Home behavior. Fresh installs from 0.5.0+ already get the bare-bones config below as the default. The original diagnostic notes are kept in [HANDOFF.md](HANDOFF.md) for reference; the workaround config below is still the right starting point if you hit a similar symptom.
 
 **First-line workaround**: pair with all optional services disabled (this is now the default since 0.5.0):
 
