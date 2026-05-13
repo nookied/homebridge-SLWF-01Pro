@@ -4,17 +4,27 @@
 
 ---
 
-## ⚠️ UPDATE — 2026-05-06 (post-0.5.3)
+## ⚠️ UPDATE — 2026-05-13 (post-0.5.4)
 
-**The pairing issue was resolved across 0.4.4 → 0.5.1.** The user successfully paired the SLWF child bridge in Apple Home and sees all devices. The fix bundle:
+**Plugin is fully working.** User has 5 ACs paired, all controllable from Apple Home. Current published version is **0.5.4** with **159 unit tests across 8 suites**.
 
-- **0.4.4** — Eve `CurrentPowerConsumption` moved off the standard `HeaterCooler` service onto a linked `Service.Outlet`, which is then `setHiddenService(true)` so it doesn't render as a separate tile in Apple Home but still feeds Eve.app via the HAP database. Schema bump 4 → 5 forces clean accessory recreation on upgrade.
-- **0.5.0** — All companion services (`Humidity`, `OutdoorTemp`, `Power`, `Beeper`, `Display`, `DRY`, `FAN_ONLY`) hidden by default; `autoDiscover` on by default. This drops the per-accessory service count to just `HeaterCooler` for fresh installs, addressing the "service count tolerance" hypothesis. Per-device override semantics flipped to bidirectional so users can selectively re-enable extras.
-- **0.5.1** — Apple-Home renames persist across restarts (`setConfiguredName` only seeds new accessories, not cached ones). Auto-discovered offline devices keep their identity instead of being unregistered (`pruneOrphanedAccessories` early-returns when `autoDiscover` is on).
-- **0.5.2** — Empty Homebridge UI form rows are silently ignored instead of logging host warnings on every restart.
-- **0.5.3** — Restore mode now respects advertised capabilities (heat-only devices don't turn back on as COOL), newly-enabled companion services on cached accessories get `ConfiguredName`, current-temperature is clamped to the HAP-safe range, and invalid hostless manual entries keep cached accessories instead of allowing destructive pruning.
+### Fix history summary (0.4.4 → 0.5.4)
 
-The diagnostic flow below is preserved for reference if a similar symptom returns. Current published version is **0.5.3** with **159 unit tests across 8 suites**.
+- **0.4.4** — Eve power moved off `HeaterCooler` to a linked hidden `Service.Outlet`; schema bump 4 → 5.
+- **0.5.0** — All companion services hidden by default; `autoDiscover` on by default; bidirectional per-device overrides.
+- **0.5.1** — Apple Home renames persist; auto-discovered offline devices keep their identity.
+- **0.5.2** — Empty Homebridge UI rows silently ignored.
+- **0.5.3** — Capability-aware restore mode; `ConfiguredName` seeding; current-temp clamping; invalid-config prune guard.
+- **0.5.4** — ⚠️ fault indicator no longer persists after Homebridge restart (startup delayed re-push) or flashes on transient standby disconnects (15-second grace period).
+
+### What triggered 0.5.4 (for future reference)
+
+After the user's Homebridge auto-updated to v2.0.2 / HAP v2.1.6, all AC tiles showed ⚠️ on startup and whenever ACs were in the "Off" state. Root cause was two-fold:
+
+1. **Stale fault on restart**: a fault from the pre-restart session was cached in Apple Home. The startup `updateValue(NO_FAULT)` call in `addClimateService` ran before Apple Home's asynchronous HAP subscription, so the cleared state was never delivered. Fix: 3-second delayed re-push in the constructor (`STARTUP_FAULT_CLEAR_DELAY_MS = 3000`).
+2. **Transient disconnect on standby**: when an AC is turned off, the SLWF-01Pro dongle may briefly drop its TCP connection (the AC board resets standby power). The `'disconnected'` event immediately set `StatusFault = GENERAL_FAULT`. Fix: 15-second grace period before setting fault (`DISCONNECT_FAULT_DELAY_MS = 15000`); reconnect within the window cancels the timer.
+
+The diagnostic flow below is preserved for reference if similar symptoms return.
 
 ---
 

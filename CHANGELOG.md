@@ -7,6 +7,15 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [0.5.4] — 2026-05-13
+
+### Fixed
+
+- **Fault indicator (⚠️) no longer persists after a Homebridge restart.** Apple Home subscribes to HAP events asynchronously after the bridge starts; when a device had a fault from the previous session, the startup `StatusFault = NO_FAULT` push arrived before Apple Home subscribed and was silently missed, leaving the ⚠️ visible until the user manually interacted with the tile. A 3-second delayed re-push (`STARTUP_FAULT_CLEAR_DELAY_MS`) after accessory construction ensures the cleared state reaches Apple Home once it has subscribed.
+- **Fault indicator no longer flashes on transient standby disconnects.** ESPHome dongles that briefly lose their TCP connection when the AC unit enters standby would immediately set `StatusFault = GENERAL_FAULT`. A 15-second grace period (`DISCONNECT_FAULT_DELAY_MS`) now absorbs brief drops: if the device reconnects within the window, no fault is ever shown. Persistent disconnects (> 15 s) still correctly surface the fault. Both new timers call `.unref()` so they don't prevent clean process exit.
+
+---
+
 ## [0.5.3] — 2026-05-06
 
 ### Fixed

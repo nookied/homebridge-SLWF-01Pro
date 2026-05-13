@@ -13,10 +13,10 @@ This file is the canonical persistent memory for this project. Any assistant/age
 **Repo:** [`https://github.com/nookied/homebridge-SLWF-01Pro`](https://github.com/nookied/homebridge-SLWF-01Pro) — **maintained fork**
 **Original (upstream):** [`nitaybz/homebridge-esphome-ac`](https://github.com/nitaybz/homebridge-esphome-ac) — last release 0.0.4. The `upstream` git remote was deliberately removed in v0.2.0; the fork is fully independent.
 **License:** MIT (preserved from original)
-**Current version:** **0.5.3** — published on npm with provenance. 159 unit tests passing across 8 suites. CI on Node 18.20.4 / 20.15.1 / 22.x / 24.x. Tag-driven release pipeline. `ACCESSORY_SCHEMA_VERSION = 5`.
+**Current version:** **0.5.4** — published on npm with provenance. 159 unit tests passing across 8 suites. CI on Node 18.20.4 / 20.15.1 / 22.x / 24.x. Tag-driven release pipeline. `ACCESSORY_SCHEMA_VERSION = 5`.
 **Engines:** Homebridge `^1.8.0 || ^2.0.0`; Node `^18.20.4 || ^20.15.1 || ^22.0.0 || ^24.0.0`
 
-> **Pairing status (resolved enough to use):** The child-bridge pairing issue from the 0.4.x audit (see [HANDOFF.md](HANDOFF.md) for original brief) was addressed across 0.4.4 → 0.5.1. The user successfully paired and sees devices. The fix bundle: Eve power moved off the `HeaterCooler` service onto a linked, hidden `Service.Outlet` (0.4.4); companion services hidden by default to keep visible service count down (0.5.0); ConfiguredName preserved across restarts so Apple Home renames stick (0.5.1); auto-discovered offline devices no longer pruned so Apple Home identity survives reboots (0.5.1). 0.5.2 removed empty Homebridge UI row log noise. 0.5.3 added capability-aware restore mode, ConfiguredName seeding for newly-enabled cached companion services, current-temperature clamping, and a non-destructive prune guard for invalid hostless manual entries. Per-device disable flags now override platform defaults *bidirectionally* (0.5.0).
+> **Pairing status (resolved enough to use):** The child-bridge pairing issue from the 0.4.x audit (see [HANDOFF.md](HANDOFF.md) for original brief) was addressed across 0.4.4 → 0.5.1. The user successfully paired and sees devices. The fix bundle: Eve power moved off the `HeaterCooler` service onto a linked, hidden `Service.Outlet` (0.4.4); companion services hidden by default to keep visible service count down (0.5.0); ConfiguredName preserved across restarts so Apple Home renames stick (0.5.1); auto-discovered offline devices no longer pruned so Apple Home identity survives reboots (0.5.1). 0.5.2 removed empty Homebridge UI row log noise. 0.5.3 added capability-aware restore mode, ConfiguredName seeding for newly-enabled cached companion services, current-temperature clamping, and a non-destructive prune guard for invalid hostless manual entries. 0.5.4 added a 15-second disconnect grace period so transient standby drops no longer surface a persistent ⚠️ in Apple Home. Per-device disable flags now override platform defaults *bidirectionally* (0.5.0).
 
 ### What "SLWF-01Pro" is
 
@@ -92,7 +92,7 @@ homebridge-SLWF-01Pro/
 │   │   ├── attachPowerService()                Linked Outlet service with Eve.Energy CurrentPowerConsumption + optional fakegato-history
 │   │   ├── handleModeSwitch(targetMode, on)    DRY/FAN_ONLY toggle handler — sets/restores mode via stateManager.sendState
 │   │   ├── syncModeSwitches(currentMode)       Reflect device's actual mode back into the supplementary switches
-│   │   ├── setConnectedStatus(connected)       Push StatusActive + StatusFault to climate service
+│   │   ├── setConnectedStatus(connected)       Clear fault immediately on connect; delay 15s before setting fault on disconnect
 │   │   ├── clampTargetTemperature(value)       Non-mutating clamp to [visualMin, visualMax]
 │   │   └── updateClimateState(state)           ESPHome 'state' event → all HAP characteristics
 │   │
@@ -190,7 +190,7 @@ homebridge-SLWF-01Pro/
 7. **State pushes** (ESPHome → HomeKit):
    - `entities.climate.on('state', updateClimateState)` — main path. Updates Active / CurrentTemperature / Target/CurrentHeaterCoolerState / SwingMode / RotationSpeed and `syncModeSwitches()` for DRY/FAN_ONLY tile state.
    - Each optional entity (`humiditySensor`, `outdoorTempSensor`, `powerSensor`, `beeperSwitch`) has its own `'state'` listener pushing to its respective service/characteristic. Power updates the linked Outlet's Eve `CurrentPowerConsumption` and `OutletInUse`.
-   - On disconnect, `setConnectedStatus(false)` flips StatusFault to GENERAL_FAULT (red badge in HomeKit) and StatusActive to false. Reconnect → reverts.
+   - On disconnect, `setConnectedStatus(false)` starts a 15-second grace timer (`DISCONNECT_FAULT_DELAY_MS`). If the device reconnects within the window, the timer is cancelled and no fault is shown. After 15 s of sustained disconnect, StatusFault flips to GENERAL_FAULT and StatusActive to false. Reconnect immediately clears both.
 8. **Cleanup at startup**: After spawning all clients, `pruneOrphanedAccessories(platform, liveHosts)` runs. With `autoDiscover` on (default) it early-returns — transient-offline auto-discovered devices keep their HomeKit identity. With `autoDiscover` off it unregisters any cached accessory whose `context.host` isn't in `liveHosts` (= manual `devices[]`).
 
 ## ESPHome Climate cheat sheet
@@ -336,6 +336,7 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 - **New companion services on cached accessories could miss `ConfiguredName`** *(0.5.3)*. `setConfiguredName` now preserves non-empty cached values but seeds the characteristic when the service is newly created after a config toggle.
 - **Invalid hostless manual entries could allow destructive pruning** *(0.5.3)*. Real hostless manual entries now keep cached accessories until fixed instead of letting `autoDiscover: false` prune with an incomplete config. Empty UI scaffolding remains silently dropped.
 - **Main `CurrentTemperature` was not clamped on state updates** *(0.5.3)*. Values are now constrained to the HAP-safe `-100..100` range before updating the primary HeaterCooler service.
+- **⚠️ fault indicator persisted after Homebridge restart and on transient standby disconnects** *(0.5.4)*. Two separate issues: (1) Apple Home subscribes to HAP events asynchronously — the startup `updateValue(NO_FAULT)` arrived before subscription and was missed, leaving a stale fault from the previous session. Fixed with a 3-second delayed re-push in the constructor (`STARTUP_FAULT_CLEAR_DELAY_MS`). (2) SLWF-01Pro dongles briefly drop their TCP connection when the AC board enters standby, immediately triggering `StatusFault = GENERAL_FAULT`. Fixed with a 15-second grace period (`DISCONNECT_FAULT_DELAY_MS`): if the device reconnects within the window, no fault is shown. Both timers call `.unref()` to avoid blocking process exit. Persistent disconnects (> 15 s) still correctly surface the fault.
 
 ### By design (won't fix)
 - **No upstream PR-back.** The fork is intentionally divergent and the upstream's release cadence (last release ~2 years ago) doesn't justify the round-trip.
