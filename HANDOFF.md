@@ -4,11 +4,11 @@
 
 ---
 
-## ⚠️ UPDATE — 2026-05-13 (post-0.5.4)
+## ⚠️ UPDATE — 2026-05-13 (post-0.5.5 prep)
 
-**Plugin is fully working.** User has 5 ACs paired, all controllable from Apple Home. Current published version is **0.5.4** with **159 unit tests across 8 suites**.
+**Plugin is fully working.** User has 5 ACs paired, all controllable from Apple Home. Current published version is **0.5.5** with npm provenance. Test suite is **160 unit tests across 8 suites**.
 
-### Fix history summary (0.4.4 → 0.5.4)
+### Fix history summary (0.4.4 → 0.5.5)
 
 - **0.4.4** — Eve power moved off `HeaterCooler` to a linked hidden `Service.Outlet`; schema bump 4 → 5.
 - **0.5.0** — All companion services hidden by default; `autoDiscover` on by default; bidirectional per-device overrides.
@@ -16,12 +16,13 @@
 - **0.5.2** — Empty Homebridge UI rows silently ignored.
 - **0.5.3** — Capability-aware restore mode; `ConfiguredName` seeding; current-temp clamping; invalid-config prune guard.
 - **0.5.4** — ⚠️ fault indicator no longer persists after Homebridge restart (startup delayed re-push) or flashes on transient standby disconnects (15-second grace period).
+- **0.5.5** — Review correction: startup fault delayed clear now uses HAP-NodeJS `sendEventNotification` for same-value `NO_FAULT` clears; `package-lock.json` version metadata synced.
 
 ### What triggered 0.5.4 (for future reference)
 
 After the user's Homebridge auto-updated to v2.0.2 / HAP v2.1.6, all AC tiles showed ⚠️ on startup and whenever ACs were in the "Off" state. Root cause was two-fold:
 
-1. **Stale fault on restart**: a fault from the pre-restart session was cached in Apple Home. The startup `updateValue(NO_FAULT)` call in `addClimateService` ran before Apple Home's asynchronous HAP subscription, so the cleared state was never delivered. Fix: 3-second delayed re-push in the constructor (`STARTUP_FAULT_CLEAR_DELAY_MS = 3000`).
+1. **Stale fault on restart**: a fault from the pre-restart session was cached in Apple Home. The startup `updateValue(NO_FAULT)` call in `addClimateService` ran before Apple Home's asynchronous HAP subscription, so the cleared state was never delivered. 0.5.4 added a 3-second delayed clear in the constructor (`STARTUP_FAULT_CLEAR_DELAY_MS = 3000`). Post-review finding: the delayed clear also used `updateValue`, and HAP-NodeJS only emits from `updateValue` when the stored value changes. 0.5.5 fixes that by using `sendEventNotification` for the delayed startup clear, with an `updateValue` fallback for older HAP surfaces.
 2. **Transient disconnect on standby**: when an AC is turned off, the SLWF-01Pro dongle may briefly drop its TCP connection (the AC board resets standby power). The `'disconnected'` event immediately set `StatusFault = GENERAL_FAULT`. Fix: 15-second grace period before setting fault (`DISCONNECT_FAULT_DELAY_MS = 15000`); reconnect within the window cancels the timer.
 
 The diagnostic flow below is preserved for reference if similar symptoms return.

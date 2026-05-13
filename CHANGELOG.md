@@ -7,6 +7,19 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [0.5.5] — 2026-05-13
+
+### Fixed
+
+- **Startup fault clear now uses a forced HAP event.** The 0.5.4 delayed startup clear used `updateValue(NO_FAULT)`, but HAP-NodeJS only notifies HomeKit subscribers when `updateValue` changes the stored value. Because the service had already been initialized as healthy, the delayed same-value clear could still be silent. The delayed startup clear now calls `sendEventNotification` when available, falling back to `updateValue` for older HAP surfaces.
+- **`package-lock.json` version is synced with `package.json`.** The 0.5.4 version bump updated `package.json` but left the lockfile root metadata at 0.5.3.
+
+### Internal
+
+- Added regression coverage proving the delayed startup fault clear forces an event even when `StatusFault` is already `NO_FAULT`. 160 tests total.
+
+---
+
 ## [0.5.4] — 2026-05-13
 
 ### Fixed

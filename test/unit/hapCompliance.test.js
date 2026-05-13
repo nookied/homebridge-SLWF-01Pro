@@ -21,11 +21,13 @@ class FakeCharacteristic {
 		this.props = { ...props };
 		this.value = null;
 		this._handlers = {};
+		this.eventNotifications = [];
 	}
 	setProps(p) { Object.assign(this.props, p); return this; }
 	onSet(fn) { this._handlers.set = fn; return this; }
 	onGet(fn) { this._handlers.get = fn; return this; }
 	updateValue(v) { this.value = v; return this; }
+	sendEventNotification(v) { this.value = v; this.eventNotifications.push(v); return this; }
 	setCharacteristic(/* charCtor, value */) { return this; }
 	getCharacteristic() { return this; }
 	addOptionalCharacteristic() {}
@@ -437,6 +439,44 @@ describe('HAP-compliance: visual temp props sanitization', () => {
 		const acc = platform.accessories[0];
 		const heaterCooler = acc.getService(Service.HeaterCooler);
 		expect(heaterCooler.getCharacteristic(Characteristic.CurrentTemperature).value).toBe(100);
+	});
+});
+
+describe('HAP-compliance: startup fault clear', () => {
+	test('delayed startup clear forces a HAP event even when the value is unchanged', () => {
+		const timers = [];
+		const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((fn, ms) => {
+			const timer = { fn, ms, unref: jest.fn() };
+			timers.push(timer);
+			return timer;
+		});
+
+		try {
+			const platform = makeFakePlatform();
+			platform.api.registerPlatformAccessories = () => {};
+			new DeviceAccessory({
+				device: { name: 'AC', host: '192.168.1.10' },
+				deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+				entities: { climate: makeFakeClimateEntity() },
+				platform,
+			});
+
+			const acc = platform.accessories[0];
+			const heaterCooler = acc.getService(Service.HeaterCooler);
+			const statusActive = heaterCooler.getCharacteristic(Characteristic.StatusActive);
+			const statusFault = heaterCooler.getCharacteristic(Characteristic.StatusFault);
+			expect(statusFault.value).toBe(Characteristic.StatusFault.NO_FAULT);
+			expect(statusFault.eventNotifications).toEqual([]);
+
+			const startupTimer = timers.find(t => t.ms === 3000);
+			expect(startupTimer).toBeDefined();
+			startupTimer.fn();
+
+			expect(statusActive.eventNotifications).toEqual([true]);
+			expect(statusFault.eventNotifications).toEqual([Characteristic.StatusFault.NO_FAULT]);
+		} finally {
+			setTimeoutSpy.mockRestore();
+		}
 	});
 });
 
