@@ -8,25 +8,25 @@ The fork was taken at upstream 0.0.4 because the upstream's release cadence (las
 
 ## TL;DR — where we're aiming
 
-1. **Stable 0.5.x baseline.** The 0.4.x pairing concerns are resolved (user-confirmed paired); 0.5.x flipped defaults so a fresh install gives a clean Apple Home and per-device overrides became symmetric. Restart-resilience for Apple Home renames + offline auto-discovered devices landed in 0.5.1; empty Homebridge UI row filtering landed in 0.5.2; capability-aware restore mode, ConfiguredName seeding for newly-enabled cached companion services, current-temperature clamping, and a non-destructive prune guard for invalid hostless manual entries landed in 0.5.3.
+1. **Stable 0.5.x baseline.** The 0.4.x pairing concerns are resolved (user-confirmed paired); 0.5.x flipped defaults so a fresh install gives a clean Apple Home and per-device overrides became symmetric. 0.5.1–0.5.3 added restart resilience, capability-aware restore mode, cached-service `ConfiguredName` seeding, current-temperature clamping, UI-row filtering, and non-destructive invalid-config guards. 0.5.7 removes sticky optional HAP transport-status characteristics and retries cached auto-discovered hosts when mDNS misses.
 2. **Apply for Homebridge Verified** once 0.5.x has a few stable weeks in the wild. All requirements are already met (dynamic platform ✓, config.schema ✓, no telemetry ✓, errors caught ✓, tests ✓, tag-driven release ✓, npm name correct ✓).
 3. **Feature coverage** — custom fan modes (`silent`/`turbo`), presets (`eco`/`boost`/`sleep`/`away`), two-point target temperature. See M4/M5 below.
 
 ---
 
-## Where we are today (0.5.3 published)
+## Where we are today (0.5.7 local patch prepared)
 
-✅ **Shipped on npm as `homebridge-slwf-01pro@0.5.3` with provenance.** Tag-driven release pipeline via GitHub Actions. CI runs lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x. **159 unit tests passing** across 8 suites (state, classifyEntity, discovery, configSchema, configSchemaValidation, hapCompliance, pruning, looksLikeRealEntry).
+✅ **Prepared locally as `homebridge-slwf-01pro@0.5.7`; publish status depends on whether the current agent has tagged and pushed it.** Tag-driven release pipeline via GitHub Actions. CI runs lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x. **167 unit tests passing** across 8 suites (state, classifyEntity, discovery, configSchema, configSchemaValidation, hapCompliance, pruning, looksLikeRealEntry).
 
-✅ Dynamic platform, per-device debouncing, mode-mapping refactor with HEAT_COOL handling. **mDNS auto-discovery on by default** (since 0.5.0). **Multi-entity bundling** (Climate + sensors + switches + buttons → one HomeKit accessory) with `HumiditySensor`, outdoor `TemperatureSensor`, hidden-Outlet Eve.Energy power, Beeper switch, Display switch, DRY/FAN_ONLY mode tiles, all hidden by default with bidirectional per-device override. `StatusActive`/`StatusFault` mirror connection state.
+✅ Dynamic platform, per-device debouncing, mode-mapping refactor with HEAT_COOL handling. **mDNS auto-discovery on by default** (since 0.5.0). **Multi-entity bundling** (Climate + sensors + switches + buttons → one HomeKit accessory) with `HumiditySensor`, outdoor `TemperatureSensor`, hidden-Outlet Eve.Energy power, Beeper switch, Display switch, DRY/FAN_ONLY mode tiles, all hidden by default with bidirectional per-device override. ESPHome connection loss is tracked internally; disconnected writes return clean HomeKit communication errors.
 
-✅ **HAP best practices** through 0.5.3: `Categories.AIR_CONDITIONER`, `setPrimaryService(true)`, `addLinkedService` for companion services (de-duped against existing links), `ConfiguredName` seeded on first registration and for newly-added cached companion services (Apple-Home renames persist across restarts), no-op `Identify` handler, `setProps` NaN-safety, primary `CurrentTemperature` clamped to HAP-safe range, `RotationSpeed.minStep` sized to fan-mode count, mode-fallthrough uses `validValues[0]`, capability-aware Active restore mode (heat-only devices never resume in COOL), unsupported HEAT/COOL writes ignored at the `set.TargetHeaterCoolerState` boundary, `FirmwareRevision` SemVer-sanitized, Eve `CurrentPowerConsumption` on a hidden linked Outlet (not on the standard `HeaterCooler` service), `ACCESSORY_SCHEMA_VERSION = 5` evicts older cached accessories on upgrade.
+✅ **HAP best practices** through 0.5.7: `Categories.AIR_CONDITIONER`, `setPrimaryService(true)`, `addLinkedService` for companion services (de-duped against existing links), `ConfiguredName` seeded on first registration and for newly-added cached companion services (Apple-Home renames persist across restarts), no-op `Identify` handler, `setProps` NaN-safety, primary `CurrentTemperature` clamped to HAP-safe range, `RotationSpeed.minStep` sized to fan-mode count, mode-fallthrough uses `validValues[0]`, capability-aware Active restore mode (heat-only devices never resume in COOL), unsupported HEAT/COOL writes ignored at the `set.TargetHeaterCoolerState` boundary, `FirmwareRevision` SemVer-sanitized, Eve `CurrentPowerConsumption` on a hidden linked Outlet (not on the standard `HeaterCooler` service), no optional `StatusActive` / `StatusFault` on `HeaterCooler`, `ACCESSORY_SCHEMA_VERSION = 6` evicts older cached accessories on upgrade.
 
-✅ **Restart-resilience** since 0.5.1: Apple Home renames stick across Homebridge restarts; auto-discovered devices that are offline at restart keep their HomeKit identity (name/room/automations) instead of being unregistered.
+✅ **Restart-resilience** since 0.5.1, strengthened in 0.5.7: Apple Home renames stick across Homebridge restarts; auto-discovered devices that are offline at restart keep their HomeKit identity (name/room/automations) instead of being unregistered; cached auto-discovered hosts are retried as connection targets when mDNS misses a scan.
 
 ✅ **Three layers of independence from upstream `homebridge-esphome-ac`**: distinct npm name (`homebridge-slwf-01pro`), distinct platform identifier (`SLWFOnePro`), distinct UUID namespace (`homebridge-slwf-01pro:<deviceId>`). Both plugins can run side-by-side on the same Homebridge.
 
-✅ **Pairing issue from 0.4.x resolved.** User successfully paired the bridge after the 0.4.4 + 0.5.0 fixes landed. [HANDOFF.md](HANDOFF.md) is kept as historical context for the diagnostic flow.
+✅ **Pairing issue from 0.4.x resolved.** User successfully paired the bridge after the 0.4.4 + 0.5.0 fixes landed. The current pairing/network diagnostic flow lives in [QA_TESTS.md §7](QA_TESTS.md).
 
 ⚠️ Pending feature gaps: custom fan modes (`silent`/`turbo`), presets (`eco`/`boost`/`sleep`/`away`), two-point target temperature. Encrypted ESPHome devices skip auto-discovery (mDNS doesn't broadcast the Noise key).
 
@@ -34,7 +34,7 @@ The fork was taken at upstream 0.0.4 because the upstream's release cadence (las
 
 ## Verified-Plugin gap analysis
 
-Source: [`homebridge/verified`](https://github.com/homebridge/verified). 11 requirements; status:
+Source: [`homebridge/plugins`](https://github.com/homebridge/plugins) verification requirements, last updated 2026-05-05. 12 requirements; status:
 
 | # | Requirement | Met? | Action |
 |---|---|---|---|
@@ -42,15 +42,16 @@ Source: [`homebridge/verified`](https://github.com/homebridge/verified). 11 requ
 | 2 | Doesn't duplicate an existing verified plugin | ✅ | Upstream `homebridge-esphome-ac` is not Verified |
 | 3 | Published to npm with source on GitHub, issues enabled | ✅ | npm package `homebridge-slwf-01pro` (after first publish) |
 | 4 | A GitHub release per new version with notes | ✅ | `release.yml` workflow auto-creates Releases on `v*` tags |
-| 5 | Runs on supported LTS Node versions | ✅ | `engines.node ^18.20.4 \|\| ^20.15.1 \|\| ^22.0.0 \|\| ^24.0.0` |
-| 6 | Installs successfully and doesn't start unless configured | ✅ | `devices: []` default → no clients spawned |
-| 7 | No TTY / non-standard startup parameters | ✅ | None |
-| 8 | Implements Settings GUI via `config.schema.json` | ✅ | Inherited from upstream; will tighten ranges in M2 |
-| 9 | No analytics / user-tracking | ✅ | None |
-| 10 | Files stored under HB storage dir | ✅ | No disk files |
-| 11 | Catches and logs own errors, no unhandled exceptions | ✅ | Fork pass added `HapStatusError` rejections + try/catch around `climateCommandService` |
+| 5 | Runs on supported LTS Node versions | ✅ | Current Homebridge-supported LTS lines are Node 22/24; CI also keeps 18.20.4/20.15.1 for Homebridge 1.8 compatibility |
+| 6 | Installs successfully and doesn't start unless configured | ✅ | Requires a platform block; with defaults it starts discovery by design, and spawns no clients when no manual/discovered/cached Climate devices exist |
+| 7 | No post-install scripts that modify the user's system | ✅ | No `postinstall`/install lifecycle scripts |
+| 8 | No TTY / non-standard startup parameters | ✅ | None |
+| 9 | Implements Settings GUI via `config.schema.json` | ✅ | Schema includes platform fields, devices, and per-device overrides |
+| 10 | No analytics / user-tracking | ✅ | None |
+| 11 | Files stored under HB storage dir | ✅ | Plugin writes no disk files of its own |
+| 12 | Catches and logs own errors, no unhandled exceptions | ✅ | Fork pass added `HapStatusError` rejections + try/catch around `climateCommandService` |
 
-**All 11 requirements met.** Verification application is queued behind a stable 0.5.x soak period with at least one external user; the earlier pairing issue is resolved enough for daily use. File via the `homebridge/verified` issue template once the soak period is satisfactory.
+**All 12 requirements met locally.** Verification application is queued behind a stable 0.5.x soak period with at least one external user; the earlier pairing issue is resolved enough for daily use. File via the `homebridge/plugins` issue template once the soak period is satisfactory.
 
 ---
 
@@ -78,13 +79,13 @@ Versioning policy below is pre-1.0; once stable, switch to strict [SemVer](https
 | **Display Toggle switch** | `Service.Switch` (stateless) + `disableDisplaySwitch` flag | ✅ Done |
 | **DRY mode switch** | `Service.Switch` + `disableDryMode` flag | ✅ Done |
 | **FAN_ONLY mode switch** | `Service.Switch` + `disableFanOnlyMode` flag | ✅ Done |
-| **StatusActive + StatusFault** | Mirror ESPHome client connect/disconnect | ✅ Done |
+| **StatusActive + StatusFault** | Originally mirrored ESPHome client connect/disconnect; removed in 0.5.7 after Apple Home cache drift proved sticky | ✅ Superseded |
 | **Unit tests (78 passing)** | `state.js` + `classifyEntity.js` + `discovery.js` | ✅ Done |
 | Lint clean | Indentation fixes via mode-mapping refactor | ✅ Done |
 | `repository.url` fix | Point to fork URL (sigstore provenance) | ✅ Done |
 | `engines` raised | Node 18.20.4+ / Homebridge ^1.8.0 || ^2.0.0 | ✅ Done |
 | `displayName` | "Homebridge SLWF-01Pro / ESPHome AC" | ✅ Done |
-| Docs (README + CLAUDE + CHANGELOG + ROADMAP + QA_TESTS + config.schema) | Warmup-style structure | ✅ Done |
+| Docs (README + DOCS + CLAUDE + CHANGELOG + ROADMAP + QA_TESTS + config.schema) | Lean doc set with explicit ownership and update process | ✅ Done |
 | **UUID derivation** | Fallback chain when ESPHome doesn't set `unique_id` | ✅ Done in 0.1.2 |
 | **npm publish + GitHub Release** | Tag-driven via `release.yml`; provenance attestation | ✅ Done |
 
@@ -129,8 +130,11 @@ Versioning policy below is pre-1.0; once stable, switch to strict [SemVer](https
 | **Empty UI row filtering** | Homebridge UI form scaffolding rows no longer log noisy host warnings. | ✅ 0.5.2 |
 | **Invalid manual config prune guard** | Cached accessories are kept when a real manual entry is missing `host`. | ✅ 0.5.3 |
 | **Capability-aware restore mode + current-temp clamp** | Heat-only devices never resume in COOL on Active=ON; primary `CurrentTemperature` is clamped to the HAP-safe range. | ✅ 0.5.3 |
+| **Sticky transport fault removal** | Optional `StatusActive` / `StatusFault` are removed from `HeaterCooler`; disconnects now fail only command writes. | ✅ 0.5.7 |
+| **Cached-host fallback after mDNS misses** | Existing auto-discovered accessories seed reconnect clients from cache when discovery misses. | ✅ 0.5.7 |
+| **DRY/FAN_ONLY Active sync** | Supplementary-mode state pushes keep the main HomeKit tile active instead of stale-off. | ✅ 0.5.7 |
 
-**Historical diagnostics:** [HANDOFF.md](HANDOFF.md) remains as the archived pairing diagnostic flow.
+**Pairing diagnostics:** [QA_TESTS.md §7](QA_TESTS.md) is the maintained pairing/network diagnostic flow.
 
 ---
 
@@ -169,12 +173,12 @@ The current code treats `HeatingThresholdTemperature` and `CoolingThresholdTempe
 
 ### ⏭️ Milestone 6 — v1.0.0 — Verified Plugin application
 
-**Goal:** apply for [Homebridge Verified](https://github.com/homebridge/verified) once the plugin has been stable in real-world use for several weeks.
+**Goal:** apply for [Homebridge Verified](https://github.com/homebridge/plugins) once the plugin has been stable in real-world use for several weeks.
 
 Pre-application checklist:
 - [ ] Plugin has been at 0.4.x or higher for ≥ 2 weeks with no patch releases
 - [ ] At least one user beyond the maintainer running it in production (issues opened + closed counts as evidence)
-- [ ] All Verified requirements verified via the [issue template](https://github.com/homebridge/verified/issues/new?template=verified-plugin.md)
+- [ ] All Verified requirements verified via the [plugin verification issue flow](https://github.com/homebridge/plugins/issues/new/choose)
 - [ ] Bump to `1.0.0` on application; from then on strict SemVer
 
 After acceptance: maintain at the cadence of new ESPHome features and Homebridge LTS Node version bumps. No planned deprecations.

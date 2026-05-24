@@ -2,7 +2,7 @@
 // form scaffolding that happens to set disable* flags by default" — the latter
 // shouldn't generate log noise on every restart.
 
-const { init, looksLikeRealEntry, collectManualDevices } = require('../../lib/esphome');
+const { init, looksLikeRealEntry, collectManualDevices, addCachedAccessoryDevices } = require('../../lib/esphome');
 
 describe('looksLikeRealEntry', () => {
 	test('empty form scaffolding is not a real entry', () => {
@@ -61,6 +61,68 @@ describe('collectManualDevices', () => {
 		expect(result.manualDevices).toHaveLength(0);
 		expect(result.invalidManualDeviceCount).toBe(1);
 		expect(warnings[0]).toContain('Missing Host AC');
+	});
+});
+
+describe('addCachedAccessoryDevices', () => {
+	function makePlatform(accessories) {
+		return {
+			autoDiscover: true,
+			accessories,
+			log: Object.assign(function () {}, {
+				easyDebug: function () {},
+			}),
+		};
+	}
+
+	test('uses cached accessory hosts as fallback connection targets when mDNS misses them', () => {
+		const devices = [{ name: 'Discovered AC', host: '192.168.1.10', port: 6053 }];
+		const platform = makePlatform([
+			{ displayName: 'Cached AC', context: { host: '192.168.1.11', port: 6054 } },
+		]);
+
+		const added = addCachedAccessoryDevices(platform, devices);
+
+		expect(added).toHaveLength(1);
+		expect(added[0]).toMatchObject({
+			name: 'Cached AC',
+			host: '192.168.1.11',
+			port: 6054,
+			cached: true,
+		});
+		expect(devices).toHaveLength(2);
+	});
+
+	test('does not duplicate cached accessories already present in manual or discovered devices', () => {
+		const devices = [{ name: 'Manual AC', host: 'ac.local', port: 6053 }];
+		const platform = makePlatform([
+			{ displayName: 'Cached AC', context: { host: 'ac.local.' } },
+		]);
+
+		const added = addCachedAccessoryDevices(platform, devices);
+
+		expect(added).toHaveLength(0);
+		expect(devices).toHaveLength(1);
+	});
+
+	test('uses evicted stale-schema accessories as fallback connection targets during schema rebuild', () => {
+		const devices = [];
+		const platform = {
+			...makePlatform([]),
+			cachedAccessoryFallbacks: [
+				{ displayName: 'Stale Cached AC', context: { host: '192.168.1.12' } },
+			],
+		};
+
+		const added = addCachedAccessoryDevices(platform, devices);
+
+		expect(added).toHaveLength(1);
+		expect(added[0]).toMatchObject({
+			name: 'Stale Cached AC',
+			host: '192.168.1.12',
+			port: 6053,
+			cached: true,
+		});
 	});
 });
 

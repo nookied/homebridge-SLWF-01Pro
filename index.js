@@ -3,11 +3,13 @@ const { PLUGIN_NAME, PLATFORM_NAME, ACCESSORY_SCHEMA_VERSION } = require('./lib/
 
 class SLWFOnePro {
 	constructor(log, config, api) {
+		config = config || {};
 		this.api = api;
 		this.log = log;
 
 		this.accessories = [];
 		this.staleAccessories = [];
+		this.cachedAccessoryFallbacks = [];
 		this.esphomeDevices = {};
 		this.PLUGIN_NAME = PLUGIN_NAME;
 		this.PLATFORM_NAME = PLATFORM_NAME;

@@ -170,10 +170,11 @@ describe('config.schema.json', () => {
 	});
 
 	test('port integer constraints are within TCP range', () => {
+		const { DEFAULT_ESPHOME_PORT } = require('../../lib/constants');
 		const port = schema.schema.properties.devices.items.properties.port;
 		expect(port.type).toBe('integer');
 		expect(port.minimum).toBe(1);
 		expect(port.maximum).toBe(65535);
-		expect(port.default).toBe(6053);
+		expect(port.default).toBe(DEFAULT_ESPHOME_PORT);
 	});
 });

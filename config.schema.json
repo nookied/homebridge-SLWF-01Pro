@@ -20,7 +20,7 @@
       },
       "autoDiscover": {
         "title": "Auto-discover SLWF-01Pro devices via mDNS",
-        "description": "Browses the local network for ESPHome `_esphomelib._tcp` services and adds any device that exposes a Climate entity. Only works for unencrypted devices. Manually configured devices in the list below take precedence and are required for any device with the ESPHome API encryption key set. Note: turning this off after it has run will *unregister* any device that wasn't also added to the list below — copy your discovered devices into the list before disabling.",
+        "description": "Browses the local network for ESPHome `_esphomelib._tcp` services and adds any device that exposes a Climate entity. Only works for unencrypted devices. Manually configured devices in the list below take precedence and are required for any device with the ESPHome API encryption key set. Previously registered auto-discovered devices are retried from the Homebridge cache while this stays enabled. Note: turning this off after it has run will *unregister* any device that wasn't also added to the list below — copy your discovered devices into the list before disabling.",
         "type": "boolean",
         "default": true
       },

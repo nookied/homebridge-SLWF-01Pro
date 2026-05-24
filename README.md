@@ -87,7 +87,7 @@ Or fully manual (required for encrypted devices and any device not on the same b
 }
 ```
 
-You can mix both — listed devices in `devices[]` take precedence; auto-discovered devices are added on top.
+You can mix both — listed devices in `devices[]` take precedence; auto-discovered devices are added on top. Since 0.5.7, previously registered auto-discovered devices are also retried from Homebridge's cached accessory data while `autoDiscover` stays enabled, so a missed mDNS scan does not leave an existing HomeKit tile without a reconnecting ESPHome client. First-time discovery still requires mDNS or a manual `devices[]` entry.
 
 ### Platform-level keys
 
@@ -96,7 +96,7 @@ You can mix both — listed devices in `devices[]` take precedence; auto-discove
 | `platform` | yes | — | Must be exactly `"SLWFOnePro"` (the platform identifier — distinct from upstream `homebridge-esphome-ac`'s `"ESPHomeAC"` to guarantee no namespace collision when both plugins are installed). Pre-0.2.0 configs using `"ESPHomeAC"` need a one-line edit. |
 | `name` | no | `SLWFOnePro` | Display name in Homebridge logs |
 | `debug` | no | `false` | Surface ESPHome state-change chatter to the main log instead of `log.debug` |
-| `autoDiscover` | no | **`true`** | mDNS-browse for ESPHome devices on the local network and create accessories automatically. Encrypted devices still need a manual `devices[]` entry — the Noise key is not broadcast. ⚠️ Turning this off after it has run will *unregister* any device that wasn't also added to `devices[]` — copy your discovered devices into the list before disabling. |
+| `autoDiscover` | no | **`true`** | mDNS-browse for ESPHome devices on the local network and create accessories automatically. Encrypted devices still need a manual `devices[]` entry — the Noise key is not broadcast. Cached auto-discovered devices are retried on later starts while this stays enabled. ⚠️ Turning this off after it has run will *unregister* any device that wasn't also added to `devices[]` — copy your discovered devices into the list before disabling. |
 | `discoveryTimeout` | no | `5` | Seconds to wait for mDNS responses before continuing. |
 | `disableHumiditySensor` | no | **`true`** | Hide the HumiditySensor service for **every** device (e.g. ACs that report a fake `0 %` because no probe is fitted). |
 | `disableOutdoorTempSensor` | no | **`true`** | Hide the outdoor TemperatureSensor service. |
@@ -151,13 +151,12 @@ Per ESPHome device, all of these services land on a single HomeKit accessory if 
 | `Service.Switch` "Display" | Button matching `*display*` (auto-resets after press) | `disableDisplaySwitch` |
 | `Service.Switch` "Dry" | Climate device's `DRY` mode | `disableDryMode` |
 | `Service.Switch` "Fan Only" | Climate device's `FAN_ONLY` mode | `disableFanOnlyMode` |
-| `StatusActive` + `StatusFault` (on the climate service) | Mirrors ESPHome client connect/disconnect | — (always on) |
 
 Entities the plugin deliberately ignores: Wi-Fi RSSI, Uptime, Factory Reset (dangerous to expose).
 
 Power monitoring is intentionally isolated in a linked, hidden Outlet service rather than attached directly to the HeaterCooler service. The Outlet doesn't render as a separate tile in Apple Home (it's marked hidden, so Home skips it), but Eve.app and other HAP-direct clients still see the service in the database and can read `CurrentPowerConsumption`. This keeps the primary AC tile limited to standard HeaterCooler characteristics, which is friendlier to Apple Home during bridge pairing.
 
-Fault reporting is deliberately conservative: brief ESPHome TCP drops get a 15-second grace period before `StatusFault` is raised, reconnects clear the fault immediately, and startup fault clears are sent as forced HAP events so Apple Home receives them even when the value was already `NO_FAULT`.
+ESPHome connection loss is handled at command time: while the native API client is disconnected, HomeKit writes fail with a standard communication error and normal control resumes on reconnect. The plugin deliberately does not expose the optional HAP `StatusFault` transport-health characteristic because Apple Home can cache that value aggressively and keep showing a stale warning after the device is healthy again.
 
 ## Behaviour
 
@@ -235,7 +234,7 @@ These are device-side issues, not plugin bugs — listed here so you know what t
 
 ### Apple Home "Connecting..." spinner hangs / "Out of compliance" / accessories invisible after pairing
 
-The 0.4.x intermittent pairing issue was addressed across 0.4.4 → 0.5.1 (Eve power off the standard `HeaterCooler` service, companion services hidden by default, schema-version eviction forcing a clean accessory recreation, ConfiguredName not clobbered on restart). 0.5.4/0.5.5 also hardened fault clearing for Homebridge v2 / newer Apple Home behavior. Fresh installs from 0.5.0+ already get the bare-bones config below as the default. The original diagnostic notes are kept in [HANDOFF.md](HANDOFF.md) for reference; the workaround config below is still the right starting point if you hit a similar symptom.
+The 0.4.x intermittent pairing issue was addressed across 0.4.4 → 0.5.1 (Eve power off the standard `HeaterCooler` service, companion services hidden by default, schema-version eviction forcing a clean accessory recreation, ConfiguredName not clobbered on restart). 0.5.7 removes the optional HAP transport fault characteristics that newer Apple Home versions could cache as stale warnings. Fresh installs from 0.5.0+ already get the bare-bones config below as the default. The current diagnostic flow lives in [QA_TESTS.md §7](QA_TESTS.md); the workaround config below is still the right starting point if you hit a similar symptom.
 
 **First-line workaround**: pair with all optional services disabled (this is now the default since 0.5.0):
 
@@ -258,7 +257,7 @@ The 0.4.x intermittent pairing issue was addressed across 0.4.4 → 0.5.1 (Eve p
 }
 ```
 
-This reduces each AC to just the climate service (heat/cool/fan/swing). Pair the bridge first; once the bridge is paired in Apple Home, re-enable the optional services one at a time (set the relevant `disable*` flag to `false` either globally or per-device), restarting between each.
+This reduces each AC to `AccessoryInformation + HeaterCooler` only (heat/cool/fan/swing on the main AC tile). Pair the bridge first; once the bridge is paired in Apple Home, re-enable the optional services one at a time (set the relevant `disable*` flag to `false` either globally or per-device), restarting between each.
 
 If pairing still hangs even with this minimal config, the issue is at a different layer — see the **Pairing diagnostic flow** in [QA_TESTS.md §7](QA_TESTS.md). Most likely:
 - Bridge HAP pairing state is stale → reset by deleting `AccessoryInfo.<bridgeId>.json` and `IdentifierCache.<bridgeId>.json` under your Homebridge `persist/` directory, then restart.
@@ -278,7 +277,7 @@ This was a real bug in upstream `homebridge-esphome-ac@0.0.4` (module-level send
 Set `disableHumiditySensor: true` (either platform-wide or just under that device's `devices[]` entry). The HumiditySensor service will be removed on the next restart.
 
 ### Auto-discovery doesn't see one of my ACs
-Likely causes: (1) the device has `api: encryption: key:` set in its ESPHome YAML, in which case mDNS doesn't broadcast the Noise key — add it manually to `devices[]`. (2) The device is on a different VLAN/subnet that blocks mDNS. (3) ESPHome's `mdns:` block is disabled. Quickest fix: list it manually in `devices[]`.
+Likely causes: (1) the device has `api: encryption: key:` set in its ESPHome YAML, in which case mDNS doesn't broadcast the Noise key — add it manually to `devices[]`. (2) The device is on a different VLAN/subnet that blocks mDNS. (3) ESPHome's `mdns:` block is disabled. If the device was already registered while `autoDiscover` remains enabled, 0.5.7+ will retry the cached host on later starts; first-time discovery still needs working mDNS or a manual `devices[]` entry. Quickest fix: list it manually in `devices[]`.
 
 ### HomeKit AUTO button missing on a device that supports auto mode
 Your device probably advertises `HEAT_COOL` (mode 1) instead of `AUTO` (mode 6). Both are now handled equivalently as of this fork's first release; if you're on upstream `homebridge-esphome-ac@0.0.4`, this was the bug.
@@ -293,24 +292,26 @@ git clone https://github.com/nookied/homebridge-SLWF-01Pro.git
 cd homebridge-SLWF-01Pro
 npm install
 npm run lint                                  # ESLint
-npm test                                      # Jest — 159 unit tests across 8 suites
+npm test                                      # Jest unit tests
 node -e "require('./index.js')"               # smoke test (loads cleanly)
 ```
 
-See [QA_TESTS.md](QA_TESTS.md) for the manual pre-release checklist and [ROADMAP.md](ROADMAP.md) for what's planned next.
+See [DOCS.md](DOCS.md) for the documentation map, [QA_TESTS.md](QA_TESTS.md) for the manual pre-release checklist, and [ROADMAP.md](ROADMAP.md) for what's planned next.
 
 ## Releasing
 
 After the pre-release checklist in [QA_TESTS.md](QA_TESTS.md) passes:
 
 ```bash
-npm version 0.1.0                              # bumps package.json + creates v0.1.0 tag
-git push --follow-tags                         # pushes commit + tag
-npm pack --dry-run                             # sanity-check tarball contents
-gh release create v0.1.0 --notes-from-tag      # GitHub Release from tag message
+npm run lint
+npm test
+node -e "require('./index.js')"                 # smoke test
+npm pack --dry-run                              # sanity-check tarball contents
+npm version patch                               # or: npm version minor / npm version 0.5.7
+git push --follow-tags                          # release.yml publishes npm + GitHub Release
 ```
 
-`package.json` has a `files` array, so `npm publish` ships only `index.js`, `lib/`, `config.schema.json`, `config-sample.json`, `LICENSE`, `README.md`, `CHANGELOG.md`. Internal docs (`CLAUDE.md`, `ROADMAP.md`, `QA_TESTS.md`, `test/`) stay out of the published tarball.
+`package.json` has a `files` array, so `npm publish` ships only `index.js`, `lib/`, `config.schema.json`, `config-sample.json`, `LICENSE`, `README.md`, `CHANGELOG.md`. Internal docs (`DOCS.md`, `CLAUDE.md`, `ROADMAP.md`, `QA_TESTS.md`, `test/`) stay out of the published tarball. The tag-driven GitHub Actions release workflow publishes to npm with provenance and creates the GitHub Release from the matching `CHANGELOG.md` section.
 
 ## License
 

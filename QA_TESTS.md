@@ -1,6 +1,6 @@
 # QA — Manual pre-release checklist
 
-Run this on the real Homebridge host before tagging a release. Jest covers the pure helpers and HAP shape (159 unit tests as of 0.5.3); this checklist is the line of defence against regressions on real ESPHome hardware that the unit suite can't see.
+Run this on the real Homebridge host before tagging a release. Jest covers the pure helpers and HAP shape (167 unit tests as of 0.5.7); this checklist is the line of defence against regressions on real ESPHome hardware that the unit suite can't see.
 
 Budget: ~10 minutes per release.
 
@@ -11,9 +11,10 @@ Budget: ~10 minutes per release.
 - [ ] Working from a clean `git status` on the release branch
 - [ ] `package.json` `version` matches the planned tag (e.g. `0.1.0` for tag `v0.1.0`)
 - [ ] `CHANGELOG.md` has an entry for the new version with date
+- [ ] Documentation changes followed [DOCS.md](DOCS.md) ownership rules; no new long-lived incident handoff file was added
 - [ ] `package.json` `repository.url` matches the GitHub repo URL exactly (sigstore provenance is strict — see CHANGELOG)
 - [ ] `npm run lint` clean
-- [ ] `npm test` — all unit tests pass (159 as of 0.5.3; bump this number alongside any test additions)
+- [ ] `npm test` — all unit tests pass (167 as of 0.5.7; bump this number alongside any test additions)
 - [ ] `node -e "require('./index.js')"` smoke test exits 0
 - [ ] Working git SHA noted for rollback: `_______________`
 
@@ -111,7 +112,7 @@ These are bugs that broke previous versions. Verify they stay fixed:
 - [ ] **`lastTargetState` survives restart** *(only works with dynamic platform)*. Set AC to Heat, restart Homebridge, tap Off then On — should resume in Heat, not the default Cool.
 - [ ] **Heat-only restore mode stays supported** — on a heat-only device, tap Off then On; the plugin must restore Heat, not send unsupported Cool.
 - [ ] **HEAT_COOL devices show AUTO button** *(broken in upstream 0.0.4 — only AUTO=6 was handled)*. If your device's mode dropdown shows `HEAT_COOL` (not `AUTO`), the HomeKit AUTO button must still appear and work.
-- [ ] **StatusFault flips on disconnect** — pull the dongle's power for 30 sec; the AC tile in HomeKit shows a red badge / "Not Responding" while disconnected; reverts to normal on reconnect.
+- [ ] **No sticky warning badge on disconnect/reconnect** — pull the dongle's power for 30 sec, then reconnect it; HomeKit writes should fail cleanly while disconnected and normal control should resume after reconnect without a persistent ⚠️ badge.
 - [ ] **Construction succeeds for devices without `unique_id` set in YAML** *(broken in 0.1.0/0.1.1; fixed in 0.1.2)*. Reproduce: an ESPHome device whose `climate:` block doesn't set `unique_id` should still get a stable HomeKit accessory; the log should show `Initialized "<name>" with N mapped entit(y|ies)` not `Failed to initialize ...: Received undefined`.
 - [ ] **Upstream-orphan warning fires when applicable** *(0.2.0+)*. If you upgraded from upstream `homebridge-esphome-ac`, the first launch logs `Detected N cached accessor… from upstream "homebridge-esphome-ac"` with cleanup instructions. After cleanup, the warning stops appearing.
 

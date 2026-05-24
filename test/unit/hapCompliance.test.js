@@ -340,7 +340,7 @@ describe('HAP-compliance: Eve power service isolation', () => {
 		const powerSensor = { type: 'Sensor', name: 'Power', config: { name: 'Power', objectId: 'power' }, state: { state: 42 }, on: () => {} };
 		const uuid = platform.api.hap.uuid.generate('homebridge-slwf-01pro:air_conditioner-fae810');
 		const cached = new platform.api.platformAccessory('AC', uuid, Categories.AIR_CONDITIONER);
-		cached.context.schemaVersion = 5;
+		cached.context.schemaVersion = 6;
 		const heaterCooler = cached.addService(Service.HeaterCooler, 'AC');
 		const LegacyPower = makeCharCtor('Current Consumption', EVE_POWER_UUID);
 		heaterCooler.getCharacteristic(LegacyPower).updateValue(13);
@@ -442,144 +442,111 @@ describe('HAP-compliance: visual temp props sanitization', () => {
 	});
 });
 
-describe('HAP-compliance: startup fault clear', () => {
-	test('delayed startup clear forces a HAP event even when the value is unchanged', () => {
-		const timers = [];
-		const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((fn, ms) => {
-			const timer = { fn, ms, unref: jest.fn() };
-			timers.push(timer);
-			return timer;
+describe('HAP-compliance: climate state updates', () => {
+	test('supplementary DRY/FAN_ONLY state pushes keep Active set to on', () => {
+		const platform = makeFakePlatform();
+		platform.api.registerPlatformAccessories = () => {};
+		const acc = new DeviceAccessory({
+			device: { name: 'AC', host: '192.168.1.10' },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			entities: {
+				climate: makeFakeClimateEntity({
+					supportedModes: [0, 2, 3, 4, 5, 6],
+					state: { mode: 0 },
+				}),
+			},
+			platform,
 		});
 
-		try {
-			const platform = makeFakePlatform();
-			platform.api.registerPlatformAccessories = () => {};
+		const heaterCooler = platform.accessories[0].getService(Service.HeaterCooler);
+		expect(heaterCooler.getCharacteristic(Characteristic.Active).value).toBe(0);
+
+		acc.updateClimateState({
+			mode: 5,
+			currentTemperature: 22,
+			targetTemperature: 21,
+			fanMode: 4,
+			swingMode: 0,
+		});
+
+		expect(heaterCooler.getCharacteristic(Characteristic.Active).value).toBe(1);
+		expect(heaterCooler.getCharacteristic(Characteristic.CurrentHeaterCoolerState).value).toBe(Characteristic.CurrentHeaterCoolerState.IDLE);
+	});
+
+	test('missing supportedModesList does not crash accessory construction', () => {
+		const platform = makeFakePlatform();
+		platform.api.registerPlatformAccessories = () => {};
+		const climate = makeFakeClimateEntity();
+		delete climate.config.supportedModesList;
+
+		expect(() => {
 			new DeviceAccessory({
 				device: { name: 'AC', host: '192.168.1.10' },
 				deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
-				entities: { climate: makeFakeClimateEntity() },
+				entities: { climate },
 				platform,
 			});
-
-			const acc = platform.accessories[0];
-			const heaterCooler = acc.getService(Service.HeaterCooler);
-			const statusActive = heaterCooler.getCharacteristic(Characteristic.StatusActive);
-			const statusFault = heaterCooler.getCharacteristic(Characteristic.StatusFault);
-			expect(statusFault.value).toBe(Characteristic.StatusFault.NO_FAULT);
-			expect(statusFault.eventNotifications).toEqual([]);
-
-			const startupTimer = timers.find(t => t.ms === 3000);
-			expect(startupTimer).toBeDefined();
-			startupTimer.fn();
-
-			expect(statusActive.eventNotifications).toEqual([true]);
-			expect(statusFault.eventNotifications).toEqual([Characteristic.StatusFault.NO_FAULT]);
-		} finally {
-			setTimeoutSpy.mockRestore();
-		}
+		}).not.toThrow();
 	});
 });
 
-describe('HAP-compliance: reconnect fault clear', () => {
-	test('reconnect forces a HAP event for controllers that subscribe after the immediate updateValue', () => {
-		const timers = [];
-		const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((fn, ms) => {
-			const timer = { fn, ms, unref: jest.fn() };
-			timers.push(timer);
-			return timer;
+describe('HAP-compliance: connection status characteristics', () => {
+	test('new HeaterCooler accessories do not expose sticky transport status characteristics', () => {
+		const platform = makeFakePlatform();
+		platform.api.registerPlatformAccessories = () => {};
+		new DeviceAccessory({
+			device: { name: 'AC', host: '192.168.1.10' },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			entities: { climate: makeFakeClimateEntity() },
+			platform,
 		});
 
-		try {
-			const platform = makeFakePlatform();
-			platform.api.registerPlatformAccessories = () => {};
-			const acc = new DeviceAccessory({
-				device: { name: 'AC', host: '192.168.1.10' },
-				deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
-				entities: { climate: makeFakeClimateEntity() },
-				platform,
-			});
-
-			const platformAcc = platform.accessories[0];
-			const heaterCooler = platformAcc.getService(Service.HeaterCooler);
-			const statusActive = heaterCooler.getCharacteristic(Characteristic.StatusActive);
-			const statusFault = heaterCooler.getCharacteristic(Characteristic.StatusFault);
-
-			// Simulate disconnect → fault timer → GENERAL_FAULT
-			timers.length = 0;
-			acc.setConnectedStatus(false);
-			const faultTimer = timers.find(t => t.ms === 15000);
-			expect(faultTimer).toBeDefined();
-			faultTimer.fn();
-			expect(statusFault.value).toBe(Characteristic.StatusFault.GENERAL_FAULT);
-
-			// Reset notification tracking
-			timers.length = 0;
-			statusFault.eventNotifications.length = 0;
-			statusActive.eventNotifications.length = 0;
-
-			// Simulate reconnect
-			acc.setConnectedStatus(true);
-
-			// Immediate updateValue clears fault in the stored value
-			expect(statusFault.value).toBe(Characteristic.StatusFault.NO_FAULT);
-			expect(statusActive.value).toBe(true);
-
-			// A 3s reconnect-clear timer must exist
-			const reconnectTimer = timers.find(t => t.ms === 3000);
-			expect(reconnectTimer).toBeDefined();
-
-			// No forced event yet — it's scheduled, not fired
-			expect(statusFault.eventNotifications).toEqual([]);
-			expect(statusActive.eventNotifications).toEqual([]);
-
-			// Fire the timer → sendEventNotification forces the clear to late subscribers
-			reconnectTimer.fn();
-			expect(statusActive.eventNotifications).toEqual([true]);
-			expect(statusFault.eventNotifications).toEqual([Characteristic.StatusFault.NO_FAULT]);
-		} finally {
-			setTimeoutSpy.mockRestore();
-		}
+		const acc = platform.accessories[0];
+		const heaterCooler = acc.getService(Service.HeaterCooler);
+		expect(heaterCooler.testCharacteristic(Characteristic.StatusActive)).toBe(false);
+		expect(heaterCooler.testCharacteristic(Characteristic.StatusFault)).toBe(false);
 	});
 
-	test('reconnect-clear is not sent when device disconnects again before the timer fires', () => {
-		const timers = [];
-		const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((fn, ms) => {
-			const timer = { fn, ms, unref: jest.fn() };
-			timers.push(timer);
-			return timer;
+	test('cached HeaterCooler status characteristics are removed during rebuild', () => {
+		const platform = makeFakePlatform();
+		platform.api.registerPlatformAccessories = () => {};
+		const uuid = platform.api.hap.uuid.generate('homebridge-slwf-01pro:air_conditioner-fae810');
+		const cached = new platform.api.platformAccessory('AC', uuid, Categories.AIR_CONDITIONER);
+		cached.context.schemaVersion = 6;
+		const heaterCooler = cached.addService(Service.HeaterCooler, 'AC');
+		heaterCooler.getCharacteristic(Characteristic.StatusActive).updateValue(false);
+		heaterCooler.getCharacteristic(Characteristic.StatusFault).updateValue(Characteristic.StatusFault.GENERAL_FAULT);
+		platform.accessories.push(cached);
+
+		new DeviceAccessory({
+			device: { name: 'AC', host: '192.168.1.10' },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			entities: { climate: makeFakeClimateEntity() },
+			platform,
 		});
 
-		try {
-			const platform = makeFakePlatform();
-			platform.api.registerPlatformAccessories = () => {};
-			const acc = new DeviceAccessory({
-				device: { name: 'AC', host: '192.168.1.10' },
-				deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
-				entities: { climate: makeFakeClimateEntity() },
-				platform,
-			});
+		expect(heaterCooler.testCharacteristic(Characteristic.StatusActive)).toBe(false);
+		expect(heaterCooler.testCharacteristic(Characteristic.StatusFault)).toBe(false);
+	});
 
-			const platformAcc = platform.accessories[0];
-			const heaterCooler = platformAcc.getService(Service.HeaterCooler);
-			const statusFault = heaterCooler.getCharacteristic(Characteristic.StatusFault);
+	test('connectivity changes update only internal reachability used by HomeKit writes', () => {
+		const platform = makeFakePlatform();
+		platform.api.registerPlatformAccessories = () => {};
+		const acc = new DeviceAccessory({
+			device: { name: 'AC', host: '192.168.1.10' },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+			entities: { climate: makeFakeClimateEntity() },
+			platform,
+		});
+		const heaterCooler = platform.accessories[0].getService(Service.HeaterCooler);
 
-			// Reconnect → starts reconnect-clear timer
-			timers.length = 0;
-			acc.setConnectedStatus(true);
-			const reconnectTimer = timers.find(t => t.ms === 3000);
-			expect(reconnectTimer).toBeDefined();
+		acc.setConnectedStatus(false);
+		expect(acc.connected).toBe(false);
+		expect(heaterCooler.testCharacteristic(Characteristic.StatusFault)).toBe(false);
 
-			// Disconnect again before timer fires → this.connected becomes false
-			statusFault.eventNotifications.length = 0;
-			acc.setConnectedStatus(false);
-
-			// Even if the callback runs (OS hasn't cancelled it yet),
-			// the this.connected !== false guard prevents a false-healthy push
-			reconnectTimer.fn();
-			expect(statusFault.eventNotifications).toEqual([]);
-		} finally {
-			setTimeoutSpy.mockRestore();
-		}
+		acc.setConnectedStatus(true);
+		expect(acc.connected).toBe(true);
+		expect(heaterCooler.testCharacteristic(Characteristic.StatusFault)).toBe(false);
 	});
 });
 

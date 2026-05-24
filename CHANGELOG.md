@@ -7,6 +7,24 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [0.5.7] — 2026-05-24
+
+### Fixed
+
+- **Apple Home ⚠️ warning no longer depends on fragile `StatusFault` cache clearing.** Versions 0.5.4–0.5.6 tried to clear stale `StatusFault` values with delayed forced HAP events, but Apple Home can still miss those events when a HomePod/iPhone subscribes later or keeps an older characteristic cache. The plugin now stops exposing optional `StatusActive` / `StatusFault` transport-health characteristics on the HeaterCooler service and removes them from cached accessories. Disconnected ESPHome clients still return a clean HomeKit communication error on writes; reconnect resumes normal control without leaving Apple Home stuck with a cached general fault.
+- **Auto-discovered cached devices are no longer stranded when mDNS misses a scan.** With `autoDiscover` on, cached accessory hosts are now used as fallback connection targets when current mDNS discovery does not rediscover them, so the plugin still creates reconnecting ESPHome clients instead of keeping Apple Home identity while leaving the runtime unbound. The cached native API port is stored from this version onward.
+- **Supplementary DRY/FAN_ONLY state pushes now keep HomeKit `Active` in sync.** If a device moved from OFF into a non-primary mode outside HomeKit, the fallback update path could leave `Active = 0` while the AC was actually running.
+
+### Internal
+
+- Bumped `ACCESSORY_SCHEMA_VERSION` to 6 so v5 cached accessories are rebuilt without the sticky transport status characteristics.
+- Refactored ESPHome device-list merging around shared host/address identifiers and a single default native API port constant.
+- Added regression coverage for status-characteristic removal, cached-host fallback discovery, missing mode capability lists, and supplementary-mode state pushes. 167 tests total.
+- Reviewed and refreshed project documentation for the 0.5.7 behavior: schema v6, cached-host fallback, release workflow, and Homebridge Verified requirements.
+- Consolidated the old pairing handoff into the maintained docs: added `DOCS.md` as the documentation index/update process, deleted `HANDOFF.md`, and kept live pairing diagnostics in `QA_TESTS.md`.
+
+---
+
 ## [0.5.6] — 2026-05-24
 
 ### Fixed
