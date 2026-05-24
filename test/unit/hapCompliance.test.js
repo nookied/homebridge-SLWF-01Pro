@@ -480,6 +480,109 @@ describe('HAP-compliance: startup fault clear', () => {
 	});
 });
 
+describe('HAP-compliance: reconnect fault clear', () => {
+	test('reconnect forces a HAP event for controllers that subscribe after the immediate updateValue', () => {
+		const timers = [];
+		const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((fn, ms) => {
+			const timer = { fn, ms, unref: jest.fn() };
+			timers.push(timer);
+			return timer;
+		});
+
+		try {
+			const platform = makeFakePlatform();
+			platform.api.registerPlatformAccessories = () => {};
+			const acc = new DeviceAccessory({
+				device: { name: 'AC', host: '192.168.1.10' },
+				deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+				entities: { climate: makeFakeClimateEntity() },
+				platform,
+			});
+
+			const platformAcc = platform.accessories[0];
+			const heaterCooler = platformAcc.getService(Service.HeaterCooler);
+			const statusActive = heaterCooler.getCharacteristic(Characteristic.StatusActive);
+			const statusFault = heaterCooler.getCharacteristic(Characteristic.StatusFault);
+
+			// Simulate disconnect → fault timer → GENERAL_FAULT
+			timers.length = 0;
+			acc.setConnectedStatus(false);
+			const faultTimer = timers.find(t => t.ms === 15000);
+			expect(faultTimer).toBeDefined();
+			faultTimer.fn();
+			expect(statusFault.value).toBe(Characteristic.StatusFault.GENERAL_FAULT);
+
+			// Reset notification tracking
+			timers.length = 0;
+			statusFault.eventNotifications.length = 0;
+			statusActive.eventNotifications.length = 0;
+
+			// Simulate reconnect
+			acc.setConnectedStatus(true);
+
+			// Immediate updateValue clears fault in the stored value
+			expect(statusFault.value).toBe(Characteristic.StatusFault.NO_FAULT);
+			expect(statusActive.value).toBe(true);
+
+			// A 3s reconnect-clear timer must exist
+			const reconnectTimer = timers.find(t => t.ms === 3000);
+			expect(reconnectTimer).toBeDefined();
+
+			// No forced event yet — it's scheduled, not fired
+			expect(statusFault.eventNotifications).toEqual([]);
+			expect(statusActive.eventNotifications).toEqual([]);
+
+			// Fire the timer → sendEventNotification forces the clear to late subscribers
+			reconnectTimer.fn();
+			expect(statusActive.eventNotifications).toEqual([true]);
+			expect(statusFault.eventNotifications).toEqual([Characteristic.StatusFault.NO_FAULT]);
+		} finally {
+			setTimeoutSpy.mockRestore();
+		}
+	});
+
+	test('reconnect-clear is not sent when device disconnects again before the timer fires', () => {
+		const timers = [];
+		const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((fn, ms) => {
+			const timer = { fn, ms, unref: jest.fn() };
+			timers.push(timer);
+			return timer;
+		});
+
+		try {
+			const platform = makeFakePlatform();
+			platform.api.registerPlatformAccessories = () => {};
+			const acc = new DeviceAccessory({
+				device: { name: 'AC', host: '192.168.1.10' },
+				deviceInfo: { macAddress: '24:D7:EB:FA:E8:10' },
+				entities: { climate: makeFakeClimateEntity() },
+				platform,
+			});
+
+			const platformAcc = platform.accessories[0];
+			const heaterCooler = platformAcc.getService(Service.HeaterCooler);
+			const statusFault = heaterCooler.getCharacteristic(Characteristic.StatusFault);
+
+			// Reconnect → starts reconnect-clear timer
+			timers.length = 0;
+			acc.setConnectedStatus(true);
+			const reconnectTimer = timers.find(t => t.ms === 3000);
+			expect(reconnectTimer).toBeDefined();
+
+			// Disconnect again before timer fires → this.connected becomes false
+			statusFault.eventNotifications.length = 0;
+			acc.setConnectedStatus(false);
+
+			// Even if the callback runs (OS hasn't cancelled it yet),
+			// the this.connected !== false guard prevents a false-healthy push
+			reconnectTimer.fn();
+			expect(statusFault.eventNotifications).toEqual([]);
+		} finally {
+			setTimeoutSpy.mockRestore();
+		}
+	});
+});
+
 describe('HAP-compliance: schema version constant is single-sourced', () => {
 	test('lib/constants.js exports ACCESSORY_SCHEMA_VERSION as a number', () => {
 		const { ACCESSORY_SCHEMA_VERSION } = require('../../lib/constants');

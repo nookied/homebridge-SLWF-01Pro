@@ -7,6 +7,18 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [0.5.6] — 2026-05-24
+
+### Fixed
+
+- **Fault indicator (⚠️) could persist after reconnect.** The 0.5.5 reconnect path cleared `StatusFault` via `updateValue`, which only notifies currently-subscribed HAP controllers. A HomePod or iPhone that re-established its HAP session after the immediate notification window (e.g. during the same brief outage that dropped the SLWF-01Pro) would keep the stale `GENERAL_FAULT` in its cache and continue showing ⚠️ even after the device was healthy. The reconnect clear now also schedules a delayed `sendEventNotification` — the same 3-second forced-push already used by the startup clear — so late-subscribing controllers receive the cleared state. A rapid disconnect-reconnect-disconnect cycle is safe: the pending timer is cancelled when the subsequent disconnect fires.
+
+### Internal
+
+- Added regression coverage for the reconnect forced-event clear and the guard that prevents a false-healthy push when the device disconnects again before the timer fires. 162 tests total.
+
+---
+
 ## [0.5.5] — 2026-05-13
 
 ### Fixed
