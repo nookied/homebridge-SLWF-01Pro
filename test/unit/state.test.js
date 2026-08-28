@@ -8,6 +8,7 @@ const {
 	pickDefaultSwingValue,
 	fanSpeedToFanMode,
 	fanModeToSpeed,
+	fanSpeedMinStep,
 	chooseInitialTargetMode,
 	pickAutoMode,
 	supportsCool,
@@ -89,17 +90,55 @@ describe('fanSpeedToFanMode + fanModeToSpeed', () => {
 	test('100% out of [LOW=3, MED=4, HIGH=5] → HIGH (5)', () => {
 		expect(fanSpeedToFanMode(100, [3, 4, 5])).toBe(5);
 	});
-	test('roundtrip MED in [3,4,5] = 67%', () => {
-		expect(fanModeToSpeed(4, [3, 4, 5])).toBe(67);
+	test('roundtrip MED in [3,4,5] = 50%', () => {
+		expect(fanModeToSpeed(4, [3, 4, 5])).toBe(50);
 	});
 	test('roundtrip HIGH in [3,4,5] = 100%', () => {
 		expect(fanModeToSpeed(5, [3, 4, 5])).toBe(100);
 	});
-	test('mode not in list → 0%', () => {
-		expect(fanModeToSpeed(99, [3, 4, 5])).toBe(0);
+	test('a mode not in the list has no percentage, so HomeKit keeps its last value', () => {
+		// Midea devices report custom fan modes ("silent"/"turbo") outside
+		// supportedFanModesList. Returning 0 here used to read back as the first
+		// mode, silently rewriting the fan speed.
+		expect(fanModeToSpeed(99, [3, 4, 5])).toBeUndefined();
 	});
 	test('empty list → undefined', () => {
 		expect(fanSpeedToFanMode(50, [])).toBe(undefined);
+	});
+
+	// Regression: the old mapping placed a mode at the top of its band while
+	// minStep was sized with floor, so reported percentages were not always on
+	// the grid HomeKit exposes, and 100% could not be selected at all.
+	test.each([
+		[[2, 3, 4, 5], 'the fan list every SLWF-01Pro in the field reports'],
+		[[3, 4, 5], 'no AUTO'],
+		[[2, 3, 4, 5, 9], 'five modes'],
+		[[3, 5], 'two modes'],
+	])('every mode round-trips and is reachable: %j (%s)', (list) => {
+		const step = fanSpeedMinStep(list);
+		expect(100 % step).toBe(0);
+
+		const reachable = [];
+		for (let v = 0; v <= 100; v += step) reachable.push(v);
+
+		for (const mode of list) {
+			const speed = fanModeToSpeed(mode, list);
+			expect(reachable).toContain(speed);
+			expect(fanSpeedToFanMode(speed, list)).toBe(mode);
+		}
+
+		expect(fanModeToSpeed(list[0], list)).toBe(0);
+		expect(fanModeToSpeed(list[list.length - 1], list)).toBe(100);
+		expect(fanSpeedToFanMode(100, list)).toBe(list[list.length - 1]);
+	});
+
+	test('minStep keeps detents when the mode count divides 100', () => {
+		expect(fanSpeedMinStep([3, 5])).toBe(100);
+		expect(fanSpeedMinStep([3, 4, 5])).toBe(50);
+		expect(fanSpeedMinStep([2, 3, 4, 5, 9])).toBe(25);
+		// 0/33/67/100 share no coarser step, so the slider is free rather than
+		// advertising detents the reported values would miss.
+		expect(fanSpeedMinStep([2, 3, 4, 5])).toBe(1);
 	});
 });
 
