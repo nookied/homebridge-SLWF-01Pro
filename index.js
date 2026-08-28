@@ -48,7 +48,11 @@ class SLWFOnePro {
 
 	configureAccessory(accessory) {
 		const cachedVersion = accessory.context && accessory.context.schemaVersion;
-		if (cachedVersion !== ACCESSORY_SCHEMA_VERSION) {
+		// Only ever evict accessories OLDER than the current schema. An accessory
+		// stamped by a newer build (someone who ran 1.1.0, which briefly used v7)
+		// is left alone — re-evicting it would cost them their Apple Home rooms a
+		// second time for no benefit.
+		if (!(cachedVersion >= ACCESSORY_SCHEMA_VERSION)) {
 			this.log.warn(`Cached accessory "${accessory.displayName}" is from an older plugin schema (v${cachedVersion || 1}); will be re-registered with the current schema (v${ACCESSORY_SCHEMA_VERSION}).`);
 			this.staleAccessories.push(accessory);
 			return;
