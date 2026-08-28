@@ -16,7 +16,7 @@ The fork was taken at upstream 0.0.4 because the upstream's release cadence (las
 
 ## Where we are today (1.1.0)
 
-✅ **1.1.0 — presets and custom fan modes**, on top of the 1.0.0 stable release prepared for a Homebridge Verified application. Tag-driven release pipeline via GitHub Actions, publishing through npm trusted publishing (OIDC, no stored token). CI runs lint + tests + smoke on Node 22 / 24 / 26. **206 unit tests passing** across 12 suites (state, classifyEntity, discovery, configSchema, configSchemaValidation, hapCompliance, pruning, looksLikeRealEntry, modeSwitch, clientOptions, eveHistory, errorHandling).
+✅ **1.1.0 — presets and custom fan modes**, on top of the 1.0.0 stable release prepared for a Homebridge Verified application. Tag-driven release pipeline via GitHub Actions, publishing through npm trusted publishing (OIDC, no stored token). CI runs lint + tests + smoke on Node 22 / 24 / 26. **250 unit tests passing** across 14 suites (state, classifyEntity, discovery, configSchema, configSchemaValidation, hapCompliance, pruning, looksLikeRealEntry, modeSwitch, clientOptions, eveHistory, errorHandling, presets, presetServices).
 
 ✅ Dynamic platform, per-device debouncing, mode-mapping refactor with HEAT_COOL handling. **mDNS auto-discovery on by default** (since 0.5.0). **Multi-entity bundling** (Climate + sensors + switches + buttons → one HomeKit accessory) with `HumiditySensor`, outdoor `TemperatureSensor`, hidden-Outlet Eve.Energy power, Beeper switch, Display switch, DRY/FAN_ONLY mode tiles, all hidden by default with bidirectional per-device override. ESPHome connection loss is tracked internally; disconnected writes return clean HomeKit communication errors.
 

@@ -250,3 +250,72 @@ describe('firmware that advertises presets it does not implement', () => {
 		expect(warnings).toHaveLength(0);
 	});
 });
+
+// The same firmware answers customFanMode "silent" with plain fanMode 3 (LOW)
+// and an empty customFanMode. Verified against the hardware. The slider then
+// settles at LOW's percentage, which looks like an unexplained jump.
+describe('firmware that reports a standard mode for a custom fan mode', () => {
+	function buildWithWarnings() {
+		const platform = makeFakePlatform();
+		platform.api.registerPlatformAccessories = () => {};
+		platform.disablePresets = false;
+		const warnings = [];
+		platform.log.warn = msg => warnings.push(String(msg));
+		const climate = makeFakeClimateEntity({ ...REAL_CAPABILITIES });
+		climate.connection = { climateCommandService: () => {} };
+		const accessory = new DeviceAccessory({
+			device: { name: 'AC', host: '192.168.1.10' },
+			deviceInfo: { macAddress: '24:D7:EB:FA:E8:10', esphomeVersion: '2024.4.2' },
+			entities: { climate },
+			platform,
+		});
+		accessory.setDelay = 1;
+		return { accessory, climate, warnings };
+	}
+
+	const stateManager = require('../../lib/stateManager');
+
+	test('a custom fan mode that comes back as a standard one is explained, once', async () => {
+		const { accessory, climate, warnings } = buildWithWarnings();
+
+		await stateManager.set.RotationSpeed.call(accessory, 20);      // silent
+		climate.emit('state', { mode: 4, fanMode: 3, customFanMode: '', swingMode: 0, preset: 0, customPreset: '' });
+
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain('silent');
+		expect(warnings[0]).toContain('2024.4.2');
+
+		await stateManager.set.RotationSpeed.call(accessory, 100);     // turbo
+		climate.emit('state', { mode: 4, fanMode: 5, customFanMode: '', swingMode: 0, preset: 0, customPreset: '' });
+		expect(warnings).toHaveLength(1);
+	});
+
+	test('the slider settles on whatever the device reports', async () => {
+		const { accessory, climate } = buildWithWarnings();
+
+		await stateManager.set.RotationSpeed.call(accessory, 20);
+		climate.emit('state', { mode: 4, fanMode: 3, customFanMode: '', swingMode: 0, preset: 0, customPreset: '' });
+
+		// LOW is rung 2 of 6 -> 40%, not the 20% that was asked for.
+		expect(accessory.HeaterCoolerService.getCharacteristic(Characteristic.RotationSpeed).value).toBe(40);
+	});
+
+	test('firmware that does honour it says nothing', async () => {
+		const { accessory, climate, warnings } = buildWithWarnings();
+
+		await stateManager.set.RotationSpeed.call(accessory, 20);
+		climate.emit('state', { mode: 4, fanMode: 3, customFanMode: 'silent', swingMode: 0, preset: 0, customPreset: '' });
+
+		expect(warnings).toHaveLength(0);
+		expect(accessory.HeaterCoolerService.getCharacteristic(Characteristic.RotationSpeed).value).toBe(20);
+	});
+
+	test('selecting a standard fan mode never warns', async () => {
+		const { accessory, climate, warnings } = buildWithWarnings();
+
+		await stateManager.set.RotationSpeed.call(accessory, 60);      // MEDIUM
+		climate.emit('state', { mode: 4, fanMode: 4, customFanMode: '', swingMode: 0, preset: 0, customPreset: '' });
+
+		expect(warnings).toHaveLength(0);
+	});
+});

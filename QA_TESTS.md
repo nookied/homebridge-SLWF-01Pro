@@ -1,6 +1,6 @@
 # QA — Manual pre-release checklist
 
-Run this on the real Homebridge host before tagging a release. Jest covers the pure helpers and HAP shape (206 unit tests); this checklist is the line of defence against regressions on real ESPHome hardware that the unit suite can't see.
+Run this on the real Homebridge host before tagging a release. Jest covers the pure helpers and HAP shape (250 unit tests); this checklist is the line of defence against regressions on real ESPHome hardware that the unit suite can't see.
 
 Budget: ~10 minutes per release.
 
@@ -31,7 +31,7 @@ Incidentally found while walking this: an AC that dropped off Wi-Fi for ten minu
 - [ ] `package.json` `repository.url` matches the GitHub repo URL exactly (sigstore provenance is strict — see CHANGELOG)
 - [ ] `.github/workflows/release.yml` is still named exactly that, and `actions/setup-node` still has **no** `registry-url` — npm matches the trusted publisher on workflow filename, and `registry-url` breaks the OIDC exchange (see CLAUDE.md → Release & npm publishing)
 - [ ] `npm run lint` clean
-- [ ] `npm test` — all unit tests pass (206 currently; bump this number alongside any test additions)
+- [ ] `npm test` — all unit tests pass (250 currently; bump this number alongside any test additions)
 - [ ] `node -e "require('./index.js')"` smoke test exits 0
 - [ ] Working git SHA noted for rollback: `_______________`
 

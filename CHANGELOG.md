@@ -15,7 +15,7 @@ Finishes ESPHome capability coverage: the presets and custom fan modes real devi
 
 - **A switch per preset.** Whatever the device advertises in `supportedPresetsList` — `Eco`, `Boost`, `Sleep` and so on — gets its own switch, as do any **custom** presets from `supportedCustomPresetsList` (Midea units commonly ship a `Freeze Protection`). They are mutually exclusive: switching one on turns the others off, and switching one off returns the AC to no preset. Hidden by default; enable with `disablePresets: false`, globally or per device. Reading only the standard enum would have missed the custom ones entirely — the SLWF-01Pro reports `[NONE, BOOST, ECO, SLEEP]` *and* a custom `freeze protection`, and does **not** advertise `AWAY`.
 - **Custom fan modes on the existing slider.** `silent` and `turbo` now sit on the same `RotationSpeed` ladder as the standard modes rather than being unreachable. A typical Midea unit goes from four rungs to six — AUTO / silent / LOW / MEDIUM / HIGH / turbo at 0 / 20 / 40 / 60 / 80 / 100 % — which also restores proper detents, since six rungs divide 100 evenly where four did not. Placement is by name (`silent`/`quiet`/`mute`/`night` below the standard speeds, `turbo`/`boost`/`powerful`/`strong`/`jet`/`max` above); ESPHome supplies no ordering, so an unrecognised custom mode is appended after the known rungs — reachable, but never claiming a speed it may not have.
-- **A warning when firmware ignores a preset.** Some firmware advertises presets it does not implement. Verified on a real SLWF-01Pro running ESPHome 2024.4.2: it lists `Boost`, `Eco`, `Sleep` and `Freeze Protection`, accepts the command without error, and stays on no preset. The switch then snaps back — honest, but indistinguishable from a plugin bug — so the plugin now logs a one-time warning naming the preset and the ESPHome version, and points at `disablePresets`. The same firmware answers a `silent` custom fan mode with plain `LOW`.
+- **A warning when firmware ignores a preset.** Some firmware advertises presets it does not implement. Verified on a real SLWF-01Pro running ESPHome 2024.4.2: it lists `Boost`, `Eco`, `Sleep` and `Freeze Protection`, accepts the command without error, and stays on no preset. The switch then snaps back — honest, but indistinguishable from a plugin bug — so the plugin now logs a one-time warning naming the preset and the ESPHome version, and points at `disablePresets`. The same firmware answers a `silent` custom fan mode with plain `LOW` and an empty `customFanMode`, so the slider settles at LOW's percentage instead of the one you picked — that gets its own one-time warning too.
 
 ### Changed
 
@@ -25,7 +25,7 @@ Finishes ESPHome capability coverage: the presets and custom fan modes real devi
 ### Internal
 
 - The wire format was checked against hardware before being relied on: `ClimateCommandRequest` sets its `has_*` flags only for fields actually supplied, so `preset`, `customPreset` and `customFanMode` compose with the existing clean-payload builder. `customFanMode` and `customPreset` are never sent empty — an empty string would ask the device to select a mode named `""` — and leaving a custom mode is expressed by sending its standard counterpart instead.
-- 246 tests across 14 suites, with the preset and fan-ladder suites built from the capability lists a live SLWF-01Pro reports.
+- 250 tests across 14 suites, with the preset and fan-ladder suites built from the capability lists a live SLWF-01Pro reports.
 
 ## [1.0.0] — 2026-08-28
 
