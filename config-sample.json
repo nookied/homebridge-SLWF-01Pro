@@ -23,6 +23,7 @@
       "disableDisplaySwitch": true,
       "disableDryMode": true,
       "disableFanOnlyMode": true,
+      "disablePresets": true,
 
       "devices": [
         {

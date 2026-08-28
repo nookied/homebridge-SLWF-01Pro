@@ -14,9 +14,9 @@ The fork was taken at upstream 0.0.4 because the upstream's release cadence (las
 
 ---
 
-## Where we are today (1.0.0)
+## Where we are today (1.1.0)
 
-✅ **1.0.0 — the first stable release**, prepared for a Homebridge Verified application. Tag-driven release pipeline via GitHub Actions, publishing through npm trusted publishing (OIDC, no stored token). CI runs lint + tests + smoke on Node 22 / 24 / 26. **206 unit tests passing** across 12 suites (state, classifyEntity, discovery, configSchema, configSchemaValidation, hapCompliance, pruning, looksLikeRealEntry, modeSwitch, clientOptions, eveHistory, errorHandling).
+✅ **1.1.0 — presets and custom fan modes**, on top of the 1.0.0 stable release prepared for a Homebridge Verified application. Tag-driven release pipeline via GitHub Actions, publishing through npm trusted publishing (OIDC, no stored token). CI runs lint + tests + smoke on Node 22 / 24 / 26. **206 unit tests passing** across 12 suites (state, classifyEntity, discovery, configSchema, configSchemaValidation, hapCompliance, pruning, looksLikeRealEntry, modeSwitch, clientOptions, eveHistory, errorHandling).
 
 ✅ Dynamic platform, per-device debouncing, mode-mapping refactor with HEAT_COOL handling. **mDNS auto-discovery on by default** (since 0.5.0). **Multi-entity bundling** (Climate + sensors + switches + buttons → one HomeKit accessory) with `HumiditySensor`, outdoor `TemperatureSensor`, hidden-Outlet Eve.Energy power, Beeper switch, Display switch, DRY/FAN_ONLY mode tiles, all hidden by default with bidirectional per-device override. ESPHome connection loss is tracked internally; disconnected writes return clean HomeKit communication errors.
 
@@ -28,7 +28,7 @@ The fork was taken at upstream 0.0.4 because the upstream's release cadence (las
 
 ✅ **Pairing issue from 0.4.x resolved.** User successfully paired the bridge after the 0.4.4 + 0.5.0 fixes landed. The current pairing/network diagnostic flow lives in [QA_TESTS.md §7](QA_TESTS.md).
 
-⚠️ Pending feature gaps: custom fan modes (`silent`/`turbo`), presets (`eco`/`boost`/`sleep`/`away`), two-point target temperature. Encrypted ESPHome devices skip auto-discovery (mDNS doesn't broadcast the Noise key).
+⚠️ Pending feature gaps: two-point target temperature. Custom fan modes and presets shipped in 1.1.0 — though firmware advertising a preset is not proof it implements one (see CLAUDE.md → Dependency notes). Encrypted ESPHome devices skip auto-discovery (mDNS doesn't broadcast the Noise key).
 
 ---
 

@@ -203,7 +203,15 @@ function makeFakePlatform() {
 }
 
 
-function makeFakeClimateEntity({ supportedModes = [0, 2, 3, 6], supportedFanModes = [2, 3, 4, 5], supportedSwingModes = [0, 1], state = {} } = {}) {
+function makeFakeClimateEntity({
+	supportedModes = [0, 2, 3, 6],
+	supportedFanModes = [2, 3, 4, 5],
+	supportedSwingModes = [0, 1],
+	supportedCustomFanModes = [],
+	supportedPresets = [],
+	supportedCustomPresets = [],
+	state = {},
+} = {}) {
 	const handlers = {};
 	return {
 		type: 'Climate',
@@ -215,6 +223,9 @@ function makeFakeClimateEntity({ supportedModes = [0, 2, 3, 6], supportedFanMode
 			supportedModesList: supportedModes,
 			supportedFanModesList: supportedFanModes,
 			supportedSwingModesList: supportedSwingModes,
+			supportedCustomFanModesList: supportedCustomFanModes,
+			supportedPresetsList: supportedPresets,
+			supportedCustomPresetsList: supportedCustomPresets,
 			visualMinTemperature: 17,
 			visualMaxTemperature: 30,
 			visualTargetTemperatureStep: 0.5,
@@ -225,6 +236,9 @@ function makeFakeClimateEntity({ supportedModes = [0, 2, 3, 6], supportedFanMode
 			targetTemperature: 21,
 			fanMode: 4,              // MEDIUM
 			swingMode: 0,
+			customFanMode: '',
+			preset: 0,
+			customPreset: '',
 			...state,
 		},
 		on(event, fn) { handlers[event] = fn; },

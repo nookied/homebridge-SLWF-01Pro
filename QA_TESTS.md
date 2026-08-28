@@ -135,6 +135,9 @@ These are bugs that broke previous versions. Verify they stay fixed:
 - [ ] **Eve history actually records** *(broken from the first release until 1.0.0)*. Enable `disablePowerSensor: false`, install `fakegato-history`, restart, and confirm Eve.app shows a power graph filling in — not just a live wattage figure. The log must not contain `Eve history unavailable`.
 - [ ] **The fan slider doesn't jump** — drag the fan speed to each detent and confirm it stays where you put it after the device reports back. On a `[AUTO, LOW, MEDIUM, HIGH]` device, 0% must mean AUTO and stay at 0%.
 - [ ] **No Factory reset tile** — confirm the Home app shows no button that could factory-reset the AC, and that the Wi-Fi Signal diagnostic sensor is absent.
+- [ ] **Preset switches** *(1.1.0)* — with `"disablePresets": false`, confirm one switch appears per advertised preset. Turning one on should leave it on **only if the AC actually enters that preset**. If it snaps back, the log must carry the one-time "advertises … but did not apply it" warning rather than leaving you guessing.
+- [ ] **Presets are mutually exclusive** — turning on a second preset switches the first off.
+- [ ] **Custom fan modes** *(1.1.0)* — on a device advertising `silent`/`turbo`, the fan slider should show six detents (0/20/40/60/80/100). Check 20 % and 100 % actually change the AC, and that the slider settles where the device reports.
 - [ ] **Fan speed tracks the device in Fan Only** — put the AC in Fan Only, change the fan speed on the AC's own remote, and confirm the HomeKit fan slider follows.
 - [ ] **Upstream-orphan warning fires when applicable** *(0.2.0+)*. If you upgraded from upstream `homebridge-esphome-ac`, the first launch logs `Detected N cached accessor… from upstream "homebridge-esphome-ac"` with cleanup instructions. After cleanup, the warning stops appearing.
 

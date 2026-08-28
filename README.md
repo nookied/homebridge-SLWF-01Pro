@@ -101,6 +101,7 @@ You can mix both — listed devices in `devices[]` take precedence; auto-discove
 | `disableHumiditySensor` | no | **`true`** | Hide the HumiditySensor service for **every** device (e.g. ACs that report a fake `0 %` because no probe is fitted). |
 | `disableOutdoorTempSensor` | no | **`true`** | Hide the outdoor TemperatureSensor service. |
 | `disablePowerSensor` | no | **`true`** | Hide the linked Outlet service carrying Eve.Energy CurrentPowerConsumption. |
+| `disablePresets` | no | **`true`** | Hide the per-preset switches (Eco / Boost / Sleep / any custom presets). |
 | `disableBeeperSwitch` | no | **`true`** | Hide the Beeper Switch service. |
 | `disableDisplaySwitch` | no | **`true`** | Hide the Display Toggle Switch service. |
 | `disableDryMode` | no | **`true`** | Hide the DRY mode Switch service. |
@@ -120,6 +121,7 @@ The companion services default to **hidden** so a fresh install gives you a clea
 | `disableHumiditySensor` | no | inherit | Per-device override (either direction). Set `false` to enable for this device when the platform default is `true`, or `true` to hide for this device when the platform default is `false`. |
 | `disableOutdoorTempSensor` | no | inherit | Per-device override |
 | `disablePowerSensor` | no | inherit | Per-device override |
+| `disablePresets` | no | inherit | Per-device override |
 | `disableBeeperSwitch` | no | inherit | Per-device override |
 | `disableDisplaySwitch` | no | inherit | Per-device override |
 | `disableDryMode` | no | inherit | Per-device override |
@@ -151,8 +153,9 @@ Per ESPHome device, all of these services land on a single HomeKit accessory if 
 | `Service.Switch` "Display" | Button matching `*display*` (auto-resets after press) | `disableDisplaySwitch` |
 | `Service.Switch` "Dry" | Climate device's `DRY` mode | `disableDryMode` |
 | `Service.Switch` "Fan Only" | Climate device's `FAN_ONLY` mode | `disableFanOnlyMode` |
+| `Service.Switch` per preset (e.g. "Eco", "Boost", "Sleep", "Freeze Protection") | `supportedPresetsList` + `supportedCustomPresetsList` | `disablePresets` |
 
-Entities the plugin deliberately ignores: Wi-Fi RSSI, Uptime, Factory Reset (dangerous to expose).
+Entities the plugin deliberately ignores: Wi-Fi RSSI, Uptime, Factory Reset, and anything ESPHome marks as a config or diagnostic entity — a Factory Reset tile one tap away from your AC controls is not worth the convenience.
 
 **Eve history is optional and not installed by default.** Live wattage works out of the box. The historical graph in Eve.app needs [`fakegato-history`](https://github.com/simont77/fakegato-history), which is declared as an *optional peer dependency* because it hard-depends on `googleapis` (~194 MB) for a storage backend this plugin never uses. To enable history, install it alongside the plugin and restart Homebridge:
 
@@ -165,6 +168,14 @@ The plugin logs a one-time notice if power monitoring is enabled without it.
 Power monitoring is intentionally isolated in a linked, hidden Outlet service rather than attached directly to the HeaterCooler service. The Outlet doesn't render as a separate tile in Apple Home (it's marked hidden, so Home skips it), but Eve.app and other HAP-direct clients still see the service in the database and can read `CurrentPowerConsumption`. This keeps the primary AC tile limited to standard HeaterCooler characteristics, which is friendlier to Apple Home during bridge pairing.
 
 ESPHome connection loss is handled at command time: while the native API client is disconnected, HomeKit writes fail with a standard communication error and normal control resumes on reconnect. The plugin deliberately does not expose the optional HAP `StatusFault` transport-health characteristic because Apple Home can cache that value aggressively and keep showing a stale warning after the device is healthy again.
+
+## Presets
+
+If your AC advertises presets, each one becomes its own switch — `Eco`, `Boost`, `Sleep`, and any **custom** presets the firmware defines (Midea units often ship a `Freeze Protection`). They are mutually exclusive: switching one on turns the others off, and switching one off returns the AC to no preset.
+
+Hidden by default. Enable with `"disablePresets": false`, globally or per device.
+
+> **Check yours actually work.** Some firmware lists presets it does not implement. A real SLWF-01Pro on ESPHome 2024.4.2 advertises `Boost`, `Eco`, `Sleep` and `Freeze Protection`, accepts the command without complaint, and then stays on no preset at all. When that happens the switch snaps back off — which is honest, but looks like a bug — so the plugin logs a one-time warning naming the preset and your ESPHome version. Updating the dongle firmware is the usual fix; `"disablePresets": true` hides them if your device is one of the ones that won't.
 
 ## Behaviour
 
@@ -189,11 +200,24 @@ Slider drags are debounced — the plugin sends one ESPHome command 600 ms after
 
 ### Fan speed
 
-HomeKit's `RotationSpeed` is a 0-100 % slider; ESPHome exposes a discrete list of fan modes. Each mode gets one evenly spaced anchor, with the **slowest mode at 0 %** and the **fastest at 100 %**, and the slider's step size is the coarsest value that lands exactly on every anchor. So a device advertising `[LOW, MEDIUM, HIGH]` gets detents at 0 / 50 / 100 %, and `[AUTO, LOW, MEDIUM, HIGH, QUIET]` gets 0 / 25 / 50 / 75 / 100 %. When the mode count doesn't divide 100 evenly (four modes, for example) the slider is left free rather than advertising detents the reported values would miss.
+HomeKit's `RotationSpeed` is a 0-100 % slider; ESPHome exposes a discrete list of fan modes, plus an optional list of **custom** fan modes in a separate field — Midea units typically advertise `silent` and `turbo` there.
 
-Most SLWF-01Pro devices report `[AUTO, LOW, MEDIUM, HIGH]`, so **0 % selects the AC's own AUTO fan mode** — HomeKit has no separate "auto" anchor to put it on. If you'd rather not have a fan slider at all, there's no separate toggle for it; it only appears when the device advertises more than one fan mode.
+Both kinds share one ladder, slowest at 0 % and fastest at 100 %, and the slider's step is the coarsest value that lands exactly on every rung. A device reporting `[AUTO, LOW, MEDIUM, HIGH]` plus `silent`/`turbo` gets six rungs:
 
-Midea units also advertise **custom** fan modes (`silent`, `turbo`) that HomeKit has nowhere to put. The plugin doesn't expose them, and if you select one from the AC's own remote the HomeKit slider simply keeps its last value rather than reporting something misleading.
+| % | Fan mode |
+|---|---|
+| 0 | AUTO |
+| 20 | silent |
+| 40 | LOW |
+| 60 | MEDIUM |
+| 80 | HIGH |
+| 100 | turbo |
+
+**0 % selects AUTO**, not "off" — HomeKit has no separate anchor for it. Custom modes are placed by name: `silent`/`quiet`/`mute`/`night` sit below the standard speeds, `turbo`/`boost`/`powerful`/`strong`/`jet`/`max` above them. ESPHome provides no ordering information, so a custom mode whose name isn't recognised is appended after the known rungs — still selectable, but never claiming a speed it might not have.
+
+If the AC is put into a mode the plugin can't place (an unrecognised custom mode set from the remote), the slider keeps its last value rather than reporting a misleading number.
+
+As with presets, older firmware may accept a custom fan mode and report something else back — ESPHome 2024.4.2 on the SLWF-01Pro answers `silent` with plain `LOW`. The slider then settles on what the device actually reports.
 
 ### Swing
 

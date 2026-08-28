@@ -13,7 +13,7 @@ This file is the canonical persistent memory for this project. Use [DOCS.md](DOC
 **Repo:** [`https://github.com/nookied/homebridge-SLWF-01Pro`](https://github.com/nookied/homebridge-SLWF-01Pro) — **maintained fork**
 **Original (upstream):** [`nitaybz/homebridge-esphome-ac`](https://github.com/nitaybz/homebridge-esphome-ac) — last release 0.0.4. The fork is fully independent; an `upstream` git remote is not required for normal work and should only be used temporarily for reference.
 **License:** MIT (preserved from original)
-**Current version:** **1.0.0** — the first stable release, prepared for a Homebridge Verified application. 206 unit tests passing across 12 suites. CI on Node 22 / 24 / 26. Tag-driven release pipeline publishing via npm trusted publishing (OIDC, no token). `ACCESSORY_SCHEMA_VERSION = 6`.
+**Current version:** **1.1.0** — presets and custom fan modes. 246 unit tests passing across 14 suites. CI on Node 22 / 24 / 26. Tag-driven release pipeline publishing via npm trusted publishing (OIDC, no token). `ACCESSORY_SCHEMA_VERSION = 6`.
 **Engines:** Homebridge `^1.8.0 || ^2.0.0`; Node `^22.0.0 || ^24.0.0 || ^26.0.0` (Node 18 and 20 are EOL and were dropped alongside the eslint 10 upgrade, which requires Node >= 20.19)
 
 > **Pairing status (resolved enough to use):** The child-bridge pairing issue from the 0.4.x audit was addressed across 0.4.4 → 0.5.1. The user successfully paired and sees devices. The fix bundle: Eve power moved off the `HeaterCooler` service onto a linked, hidden `Service.Outlet` (0.4.4); companion services hidden by default to keep visible service count down (0.5.0); ConfiguredName preserved across restarts so Apple Home renames stick (0.5.1); auto-discovered offline devices no longer pruned so Apple Home identity survives reboots (0.5.1). 0.5.2 removed empty Homebridge UI row log noise. 0.5.3 added capability-aware restore mode, ConfiguredName seeding for newly-enabled cached companion services, current-temperature clamping, and a non-destructive prune guard for invalid hostless manual entries. 0.5.4–0.5.6 attempted progressively stronger forced clears for sticky `StatusFault` warnings. 0.5.7 changes strategy: the plugin no longer exposes optional `StatusActive` / `StatusFault` transport-health characteristics, because Apple Home can cache them too aggressively; writes still return clean communication errors while disconnected. 0.5.7 also uses cached auto-discovered hosts as fallback connection targets when mDNS misses a scan. Per-device disable flags now override platform defaults *bidirectionally* (0.5.0). The maintained pairing/network diagnostic flow lives in `QA_TESTS.md` section 7.
@@ -105,6 +105,10 @@ homebridge-SLWF-01Pro/
 │   │   ├── addOptionalSensorServices()         HumiditySensor / TemperatureSensor (outdoor) / linked Outlet for Eve.Energy power
 │   │   ├── addOptionalSwitchServices()         Service.Switch for Beeper + Display Toggle
 │   │   ├── addModeSwitchServices()             Service.Switch for DRY + FAN_ONLY (mutually exclusive with primary mode)
+│   │   ├── addPresetServices()                 Service.Switch per advertised preset, incl. custom presets
+│   │   ├── handlePresetSwitch(entry, on)       Sends preset / customPreset; off sends NONE
+│   │   ├── syncPresetSwitches()                Mutually exclusive reflection of the device's preset
+│   │   ├── warnIfPresetIgnored()               One-time warning when firmware advertises a preset it ignores
 │   │   ├── removeDisabledServices()            Honour disable* flags AND missing entities (cached cleanup)
 │   │   ├── attachOptionalEntityListeners()     Bind ESPHome 'state' events for sensors / switches / power
 │   │   ├── attachPowerService()                Linked Outlet service with Eve.Energy CurrentPowerConsumption + optional fakegato-history (optional peer dep; warns once if absent)
@@ -138,6 +142,12 @@ homebridge-SLWF-01Pro/
 │   │   ├── fanSpeedToFanMode(speed, list)          0–100% → nearest fan-mode anchor
 │   │   ├── fanModeToSpeed(fanMode, list)           Fan mode → its anchor %; undefined for custom/unknown modes
 │   │   ├── fanSpeedMinStep(list)                   Coarsest RotationSpeed step landing on every anchor
+│   │   ├── buildFanLadder(modes, customModes)      Standard + custom fan modes on one ordered ladder
+│   │   ├── speedToFanCommand(speed, ladder)        % → {fanMode} or {customFanMode}, never both
+│   │   ├── fanStateToSpeed(mode, custom, ladder)   Device state → %; custom mode wins over stale fanMode
+│   │   ├── buildPresetList(presets, customPresets) Advertised presets (minus NONE) + custom presets
+│   │   ├── activePresetEntry(preset, custom, list) Which preset the device reports being in
+│   │   ├── presetSubtype(entry)                    Stable HAP service subtype for a preset
 │   │   └── chooseInitialTargetMode(stateMode)      Initial cached state for new accessories
 │   │
 │   ├── eve.js                            Eve.app custom characteristic factory
@@ -209,7 +219,7 @@ homebridge-SLWF-01Pro/
 5. `DeviceAccessory` constructor:
    - Computes `UUID = api.hap.uuid.generate(UUID_NAMESPACE + ':' + deriveDeviceId(...))` so this fork never collides with upstream for the same physical AC.
    - Looks up cached accessory by UUID; if found, reuse it (refresh `context.host`). If not, `new api.platformAccessory(name, uuid)` → `api.registerPlatformAccessories`.
-   - Calls `setupAccessoryInformation()` → `addClimateService()` → `removeLegacyPowerCharacteristic()` → `addOptionalSensorServices()` → `addOptionalSwitchServices()` → `addModeSwitchServices()` → `removeDisabledServices()` → `linkOptionalServices()` → `attachOptionalEntityListeners()`.
+   - Calls `setupAccessoryInformation()` → `addClimateService()` → `removeLegacyPowerCharacteristic()` → `addOptionalSensorServices()` → `addOptionalSwitchServices()` → `addModeSwitchServices()` → `addPresetServices()` → `removeDisabledServices()` → `linkOptionalServices()` → `attachOptionalEntityListeners()`.
    - `removeDisabledServices` is idempotent — both "disabled by config flag" and "missing entity on device" trigger removal.
 6. **Writes** (HomeKit → ESPHome):
    - HomeKit `.onSet(handler)` → `stateManager.set.<X>` mutates `that.state.<field>` and calls `sendState(that)`.
@@ -380,6 +390,7 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 - **`clearSession: false` on the ESPHome `Client` is load-bearing.** The client destroys and recreates its entity objects on reconnect *only* when `clearSession` is true. `DeviceAccessory` binds its `'state'` listeners to those objects exactly once, and `esphome.js`'s `'initialized'` handler deliberately early-returns on reconnect — so flipping the flag would leave the plugin holding destroyed entities, and HomeKit would silently stop receiving updates after the first reconnect. Pinned by `test/unit/clientOptions.test.js`.
 - **`fakegato-history` is an optional peer dependency, not a dependency.** It hard-depends on `googleapis` (~194 MB) for a Google Drive storage backend this plugin never uses, and that tree carried the package's only production advisory. It is declared under `peerDependencies` with `peerDependenciesMeta.optional: true`, so npm does **not** install it automatically. Live power readings work without it; only the Eve history graph needs it. `lib/DeviceAccessory.js` `try/catch`-wraps the `require` and warns once per Homebridge run when power monitoring is enabled but the module is missing.
 - **`fakegato-history` must be called as a FACTORY.** `require('fakegato-history')` returns `function (pHomebridge) { …; return FakeGatoHistory }` — call it with the Homebridge api and `new` the *result*. Calling `new` on the factory itself sets fakegato's internal `homebridge` to the first argument and throws on `homebridge.hap`. That is what the plugin did until 1.0.0, and because the throw was caught at `easyDebug` level, Eve history silently never worked. Pinned by `test/unit/eveHistory.test.js`.
+- **Some firmware advertises presets it does not implement.** A live SLWF-01Pro on ESPHome 2024.4.2 lists `[NONE, BOOST, ECO, SLEEP]` plus a custom `freeze protection`, accepts `preset`/`customPreset` commands without error, and stays on preset `0`. The same firmware answers `customFanMode: "silent"` by reporting plain `fanMode: 3` (LOW) with `customFanMode` empty. `mode` commands work normally on that device, so it is not a transport problem. `warnIfPresetIgnored()` exists because of this, and `disablePresets` defaults to `true`. Do not treat a capability list as proof of a capability.
 - **The declared floor for `@2colors/esphome-native-api` is `^1.3.6`.** It was `^1.2.3` while the lockfile pinned 1.2.3, so CI tested a client three years older than the one users resolved to. The API surface the plugin touches (`climateCommandService`, `Discovery`, and the `deviceInfo` fields) is unchanged between the two.
 
 ## Working rules (for this repo)

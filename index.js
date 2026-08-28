@@ -30,6 +30,7 @@ class SLWFOnePro {
 		this.disableDisplaySwitch = config.disableDisplaySwitch ?? true;
 		this.disableDryMode = config.disableDryMode ?? true;
 		this.disableFanOnlyMode = config.disableFanOnlyMode ?? true;
+		this.disablePresets = config.disablePresets ?? true;
 		this.disablePowerSensor = config.disablePowerSensor ?? true;
 
 		this.log.easyDebug = (...content) => {

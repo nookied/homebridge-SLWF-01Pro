@@ -67,6 +67,12 @@
         "type": "boolean",
         "default": true
       },
+      "disablePresets": {
+        "title": "Hide preset switches",
+        "description": "Presets your AC advertises (Eco, Boost, Sleep, and any custom ones such as Freeze Protection) each get their own switch. Only one can be active at a time.",
+        "type": "boolean",
+        "default": true
+      },
       "devices": {
         "type": "array",
         "items": {
@@ -124,6 +130,10 @@
             "disableFanOnlyMode": {
               "title": "Hide FAN_ONLY mode switch for this device (overrides platform default)",
               "type": "boolean"
+            },
+            "disablePresets": {
+              "title": "Hide preset switches for this device (overrides platform default)",
+              "type": "boolean"
             }
           }
         }
@@ -152,7 +162,8 @@
         "disableBeeperSwitch",
         "disableDisplaySwitch",
         "disableDryMode",
-        "disableFanOnlyMode"
+        "disableFanOnlyMode",
+        "disablePresets"
       ]
     },
     {
@@ -181,7 +192,8 @@
             "devices[].disableBeeperSwitch",
             "devices[].disableDisplaySwitch",
             "devices[].disableDryMode",
-            "devices[].disableFanOnlyMode"
+            "devices[].disableFanOnlyMode",
+            "devices[].disablePresets"
           ]
         }
       ]
