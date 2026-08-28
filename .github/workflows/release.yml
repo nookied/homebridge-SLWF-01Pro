@@ -5,7 +5,10 @@ on:
     tags: ['v*']
 
 permissions:
-  contents: write
+  contents: write   # for `gh release create`
+  # Mints the OIDC token npm exchanges for publish rights. This is the
+  # ONLY credential in the release path — there is no NPM_TOKEN. See the
+  # "Publish to npm" step.
   id-token: write
 
 jobs:
@@ -16,12 +19,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node 22
+      # `node-version: lts/*` (not a pinned 22.x) is required: trusted
+      # publishing needs npm >= 11.5.1, and Node 22 ships npm 10. The
+      # explicit assert below catches it if lts/* ever moves backwards.
+      #
+      # NOTE: `registry-url` is deliberately NOT set here, and must not be
+      # re-added. It makes setup-node write
+      # `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}` into .npmrc.
+      # With trusted publishing there is no NODE_AUTH_TOKEN, so that expands
+      # to an empty string — npm then sees "auth is already configured",
+      # never starts the OIDC exchange, and fails with the same misleading
+      # `404 PUT` that a dead token produces. registry.npmjs.org is the
+      # default registry anyway, so nothing is lost by omitting it.
+      # See actions/setup-node#1551 and npm/documentation#1960.
+      - name: Set up Node (lts/*)
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version: lts/*
           cache: npm
-          registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
         run: npm ci
@@ -45,10 +60,56 @@ jobs:
       - name: Smoke (module loads)
         run: node -e "require('./index.js')"
 
-      - name: Publish to npm with provenance
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Trusted publishing needs npm >= 11.5.1 (and Node >= 22.14). `lts/*`
+      # satisfies both today, but if it ever resolves to something older the
+      # publish would fail with an opaque 404 rather than an obvious version
+      # problem — so check explicitly and say so.
+      - name: Verify npm supports trusted publishing
+        run: |
+          echo "node $(node --version), npm $(npm --version)"
+          node -e '
+            const need = [11, 5, 1];
+            const got = process.argv[1].split(".").map(Number);
+            const ok = got[0] > need[0] ||
+              (got[0] === need[0] && (got[1] > need[1] ||
+                (got[1] === need[1] && got[2] >= need[2])));
+            if (!ok) {
+              console.error(`::error::npm ${process.argv[1]} is too old for trusted publishing (need >= 11.5.1). Pin node-version, or add a corepack/npm upgrade step.`);
+              process.exit(1);
+            }
+          ' "$(npm --version)"
+
+      # Belt-and-braces for the trap described above: strip any _authToken
+      # line from the runner's npmrc, wherever it came from, so the OIDC
+      # exchange is always the path taken.
+      - name: Ensure no stale npm auth blocks the OIDC exchange
+        run: |
+          NPMRC="$(npm config get userconfig)"
+          if [ -f "$NPMRC" ] && grep -q '_authToken' "$NPMRC"; then
+            echo "Removing _authToken line from $NPMRC"
+            sed -i '/_authToken/d' "$NPMRC"
+          else
+            echo "No _authToken in $NPMRC — nothing to do"
+          fi
+
+      # Authenticates via GitHub OIDC against the trusted publisher configured
+      # for this package on npmjs.com (org `nookied`, repo
+      # `homebridge-SLWF-01Pro`, workflow `release.yml`). No NPM_TOKEN: the
+      # previous long-lived Granular Access Token was created 2026-05-24 and
+      # Granular Access Tokens cap at 90 days, so it expired 2026-08-22 — the
+      # next tagged release would have failed with a misleading `404 PUT`,
+      # exactly as homebridge-warmup-v2's v3.12.0 release did.
+      #
+      # `--provenance` is deliberately absent — trusted publishing generates
+      # and publishes the attestation automatically, and passing the flag as
+      # well is redundant.
+      #
+      # If this ever 404s again, the first thing to check is that the trusted
+      # publisher config on npmjs.com still matches this repo AND this
+      # workflow *filename* — npm matches on the filename alone, so renaming
+      # this file silently breaks publishing.
+      - name: Publish to npm
+        run: npm publish --access public
 
       - name: Extract release notes from CHANGELOG
         run: |

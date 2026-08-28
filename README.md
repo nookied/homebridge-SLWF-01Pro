@@ -311,7 +311,7 @@ npm version patch                               # or: npm version minor / npm ve
 git push --follow-tags                          # release.yml publishes npm + GitHub Release
 ```
 
-`package.json` has a `files` array, so `npm publish` ships only `index.js`, `lib/`, `config.schema.json`, `config-sample.json`, `LICENSE`, `README.md`, `CHANGELOG.md`. Internal docs (`DOCS.md`, `CLAUDE.md`, `ROADMAP.md`, `QA_TESTS.md`, `test/`) stay out of the published tarball. The tag-driven GitHub Actions release workflow publishes to npm with provenance and creates the GitHub Release from the matching `CHANGELOG.md` section.
+`package.json` has a `files` array, so `npm publish` ships only `index.js`, `lib/`, `config.schema.json`, `config-sample.json`, `LICENSE`, `README.md`, `CHANGELOG.md`. Internal docs (`DOCS.md`, `CLAUDE.md`, `ROADMAP.md`, `QA_TESTS.md`, `test/`) stay out of the published tarball. The tag-driven GitHub Actions release workflow publishes to npm — authenticated by GitHub OIDC [trusted publishing](https://docs.npmjs.com/trusted-publishers), so no npm token is stored anywhere and the provenance attestation is generated automatically — and creates the GitHub Release from the matching `CHANGELOG.md` section.
 
 ## License
 

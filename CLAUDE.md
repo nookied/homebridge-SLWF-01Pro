@@ -41,7 +41,18 @@ Compatible AC brands (per SMLIGHT): Midea, Idea, Electrolux, Beko, Neoclima, Bos
   All three together mean the two plugins can run **alongside each other** on the same Homebridge with full auto-discovery, no interference.
 - The `upstream` git remote was **removed as project policy** in v0.2.0. The fork is intentionally divergent; the upstream's release cadence (last release ~2 years ago) doesn't justify the round-trip. If a local checkout temporarily has an `upstream` remote for reference, do not treat it as part of the release state.
 - `package.json` `repository.url` MUST point at this fork (`git+https://github.com/nookied/homebridge-SLWF-01Pro.git`). npm sigstore provenance is strict — a mismatch causes `npm publish` to fail with HTTP 422 (warmup4ie hit this once).
-- CI runs lint + tests + smoke on Node 18/20/22/24 for every push (`.github/workflows/ci.yml`). Releases are tag-driven: `npm version patch|minor|major && git push --follow-tags` triggers `release.yml`, which publishes to npm with provenance and creates a GitHub Release.
+- CI runs lint + tests + smoke on Node 18/20/22/24 for every push (`.github/workflows/ci.yml`). Releases are tag-driven: `npm version patch|minor|major && git push --follow-tags` triggers `release.yml`, which publishes to npm and creates a GitHub Release. See [Release & npm publishing](#release--npm-publishing) below.
+
+### Release & npm publishing
+
+- `.github/workflows/ci.yml` — lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x, every push and PR.
+- `.github/workflows/release.yml` — tag-driven (`v*`). Verifies the tag matches `package.json` version, runs lint + tests + smoke, publishes to npm, then creates a GitHub Release from the matching `CHANGELOG.md` section.
+- **No npm secret is required.** Publishing uses npm **trusted publishing** (GitHub OIDC), configured on npmjs.com under the package's *Trusted Publisher* settings: org `nookied`, repo `homebridge-SLWF-01Pro`, workflow filename `release.yml`, environment blank. The workflow's `id-token: write` permission is the only credential in the path. Provenance is generated automatically — **do not re-add `--provenance`**.
+  - This replaced a long-lived Granular Access Token. The repo's `NPM_TOKEN` secret was last written 2026-05-24 and Granular Access Tokens cap at 90 days, putting expiry around **2026-08-22** — already past, so the next tagged release would have failed with **`404 Not Found - PUT`**. npm reports a dead or unauthorized token as a missing package, so a 404 on publish means *auth*, not a missing package. (`homebridge-warmup-v2` hit exactly this on its v3.12.0 release.) Trusted publishing has no expiry, so this cannot recur. The dead `NPM_TOKEN` secret is left in the repo but is no longer read by anything.
+  - **Two traps that both produce that same misleading 404:**
+    1. **Never set `registry-url` on `actions/setup-node`.** It writes `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}` into `.npmrc`; with no token that expands to empty, npm decides auth is already configured, and never starts the OIDC exchange. (`actions/setup-node#1551`, `npm/documentation#1960`.) The workflow carries a comment saying so, plus a defensive step that strips any `_authToken` line.
+    2. **Never rename `release.yml`.** npm matches the trusted publisher on the workflow *filename* alone; renaming it silently breaks publishing until the npmjs.com config is updated to match.
+  - Requires npm >= 11.5.1 and Node >= 22.14 on the runner. The release job uses `node-version: lts/*` — **not** a pinned `22.x`, because Node 22 ships npm 10 — and asserts the npm version explicitly rather than letting an old npm surface as an opaque 404.
 
 ### What it does
 
@@ -146,7 +157,7 @@ homebridge-SLWF-01Pro/
 │
 ├── .github/workflows/
 │   ├── ci.yml                            Lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x, every push + PR
-│   └── release.yml                       Tag-driven (`v*`); npm publish --provenance + GitHub Release with notes from CHANGELOG
+│   └── release.yml                       Tag-driven (`v*`); npm publish via OIDC trusted publishing (no token) + GitHub Release
 │
 ├── package.json                          scripts: lint / lint:fix / test / test:all
 ├── config.schema.json                    Homebridge UI form-based config editor (autoDiscover + per-device disable flags)
@@ -391,7 +402,7 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 | `lib/eve.js` | Eve.Energy `CurrentPowerConsumption` custom characteristic factory |
 | `lib/constants.js` | Single source of truth: `PLUGIN_NAME`, `PLATFORM_NAME`, `ACCESSORY_SCHEMA_VERSION`, `UUID_NAMESPACE` |
 | `.github/workflows/ci.yml` | Lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x |
-| `.github/workflows/release.yml` | Tag-driven npm publish + GitHub Release |
+| `.github/workflows/release.yml` | Tag-driven npm publish (OIDC trusted publishing, no token) + GitHub Release |
 | `package.json` | Package metadata, scripts, deps |
 | `config.schema.json` | Homebridge UI form-based config editor |
 | `config-sample.json` | Reference config with one device entry |

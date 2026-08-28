@@ -7,6 +7,14 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [Unreleased]
+
+### Internal
+
+- **Releases now publish to npm via GitHub OIDC [trusted publishing](https://docs.npmjs.com/trusted-publishers) instead of a long-lived `NPM_TOKEN`.** The stored token was last written 2026-05-24 and Granular Access Tokens cap at 90 days, so it had already expired; the next tagged release would have failed with a misleading `404 Not Found - PUT` (npm reports dead auth as a missing package). Trusted publishing has no expiry and no stored secret, and emits the provenance attestation itself, so `--provenance` was dropped. The release job also moved from a pinned Node `22.x` to `lts/*`, since trusted publishing needs npm >= 11.5.1 and Node 22 ships npm 10. No change to the published package.
+
+---
+
 ## [0.5.7] — 2026-05-24
 
 ### Fixed

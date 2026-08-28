@@ -13,6 +13,7 @@ Budget: ~10 minutes per release.
 - [ ] `CHANGELOG.md` has an entry for the new version with date
 - [ ] Documentation changes followed [DOCS.md](DOCS.md) ownership rules; no new long-lived incident handoff file was added
 - [ ] `package.json` `repository.url` matches the GitHub repo URL exactly (sigstore provenance is strict — see CHANGELOG)
+- [ ] `.github/workflows/release.yml` is still named exactly that, and `actions/setup-node` still has **no** `registry-url` — npm matches the trusted publisher on workflow filename, and `registry-url` breaks the OIDC exchange (see CLAUDE.md → Release & npm publishing)
 - [ ] `npm run lint` clean
 - [ ] `npm test` — all unit tests pass (167 as of 0.5.7; bump this number alongside any test additions)
 - [ ] `node -e "require('./index.js')"` smoke test exits 0
@@ -190,5 +191,6 @@ This isolates plugin-shape vs. service-count issues.
 - [ ] Date / tester / version: `_____________________________________________`
 - [ ] Tag created: `git tag v<version>` and pushed (`git push --follow-tags`)
 - [ ] GitHub Release published with notes from CHANGELOG.md
+- [ ] `Publish to npm` step succeeded — a `404 Not Found - PUT` here means **auth**, not a missing package; check the trusted publisher config on npmjs.com still matches this repo and `release.yml`
 
 If any item failed, do **not** tag. File an issue in the repo, fix on the branch, re-run the suite, and try again.
