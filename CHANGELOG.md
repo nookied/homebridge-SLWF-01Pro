@@ -7,6 +7,16 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [1.1.2] — 2026-08-28
+
+### Fixed
+
+- **Corrected the advice given when a preset is ignored.** 1.1.1 told users that "updating the dongle firmware usually fixes this". It does not. The preset no-op is [esphome/issues#3880](https://github.com/esphome/issues/issues/3880) — open since December 2022 — a bug in ESPHome's `midea` component where a preset is selected and then reverts a second or two later. The warning now names that issue instead of sending people after an update that cannot help. The custom-fan-mode warning no longer recommends updating either.
+
+  This matters more than a wording nit on the SLWF-01Pro specifically: [esphome/issues#7191](https://github.com/esphome/issues/issues/7191), open since July 2025, reports soft and hard watchdog resets on this exact dongle across every ESPHome version tested from 2024.6.6 to 2026.5.1 — one user seeing a reboot every 20-30 minutes — while another reports the preinstalled 2024.x firmware worked fine until they updated. SMLIGHT builds with `pip install esphome` unpinned, so their releases carry whatever ESPHome shipped that day. 1.1.1 was pointing users at a change that would not fix their problem and could destabilise a working device.
+
+- README's preset section and the *Dongle firmware* guidance now say the same thing.
+
 ## [1.1.1] — 2026-08-28
 
 ### Fixed

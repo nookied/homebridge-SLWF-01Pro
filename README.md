@@ -175,7 +175,7 @@ If your AC advertises presets, each one becomes its own switch — `Eco`, `Boost
 
 Hidden by default. Enable with `"disablePresets": false`, globally or per device.
 
-> **Check yours actually work.** Some firmware lists presets it does not implement. A real SLWF-01Pro on ESPHome 2024.4.2 advertises `Boost`, `Eco`, `Sleep` and `Freeze Protection`, accepts the command without complaint, and then stays on no preset at all. When that happens the switch snaps back off — which is honest, but looks like a bug — so the plugin logs a one-time warning naming the preset and your ESPHome version. Updating the dongle firmware is the usual fix; `"disablePresets": true` hides them if your device is one of the ones that won't.
+> **On Midea hardware these very likely won't work, and that is not fixable here.** A real SLWF-01Pro advertises `Boost`, `Eco`, `Sleep` and `Freeze Protection`, accepts the command without complaint, and then stays on no preset at all — verified on ESPHome 2024.4.2. That is [esphome/issues#3880](https://github.com/esphome/issues/issues/3880), open since 2022: presets in ESPHome's `midea` component are selected, then revert after a second or two. **A firmware update does not fix it**, and on the SLWF-01Pro updating carries its own risk — see [Dongle firmware](#dongle-firmware). The switch snapping back is the plugin reporting the truth, so it logs a one-time warning naming the preset rather than leaving you to wonder. `disablePresets` is `true` by default for exactly this reason. The switches are still worth having for non-Midea ESPHome climate devices, whose preset support does work.
 
 ## Behaviour
 
