@@ -7,6 +7,15 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
+## [1.1.1] — 2026-08-28
+
+### Fixed
+
+- **Upgrading no longer resets your Apple Home layout.** 1.1.0 bumped `ACCESSORY_SCHEMA_VERSION` to 7 for the new preset switches. A bump makes Homebridge unregister and re-register every accessory, and Apple Home treats that as the device being removed and re-added — losing its room assignment and any rename. The bump bought nothing: a cached accessory picks up the preset services and the re-anchored fan slider in place, which `test/unit/cachedUpgrade.test.js` now proves. The version is back to 6.
+- **A newer accessory is never evicted.** `configureAccessory` now rebuilds only accessories *older* than the current schema, rather than any that merely differ. Without this, reverting the version would itself have evicted everyone who already installed 1.1.0 — charging them the same cost a second time to fix it. Anyone upgrading from 1.0.0 or from 1.1.0 now sees no disruption at all.
+
+> If you installed 1.1.0 and lost your room assignments, they can't be recovered from Homebridge — Apple stores them in iCloud. Accessory **names** may be recoverable: Homebridge keeps a nightly instance backup under `/var/lib/homebridge/backups/instance-backups/`, and the `Configured Name` characteristic inside its `cachedAccessories.*` file holds what you had renamed each device to.
+
 ## [1.1.0] — 2026-08-28
 
 Finishes ESPHome capability coverage: the presets and custom fan modes real devices advertise but the plugin ignored.
