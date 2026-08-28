@@ -138,19 +138,30 @@ Versioning policy below is pre-1.0; once stable, switch to strict [SemVer](https
 
 ---
 
-### ⏭️ Milestone 4 — Custom fan modes + presets
+### ⏭️ Milestone 4 — Custom fan modes + presets (targeting **1.1.0**)
 
-**Goal:** finish ESPHome capability coverage. DRY/FAN_ONLY shipped early in 0.1.0; what remains is custom fan modes and presets.
+**Goal:** finish ESPHome capability coverage. DRY/FAN_ONLY shipped early in 0.1.0; what remains is custom fan modes and presets. Deferred out of 1.0.0 deliberately: 1.0 is the Verified-application release and adding new HomeKit services would have made its diff harder to review.
+
+**This is not speculative.** Captured from a live SLWF-01Pro (ESPHome 2024.4.2, project 2.1) — every AC on the test bench advertises all of it:
+
+```jsonc
+"supportedFanModesList":       [2, 3, 4, 5],              // AUTO, LOW, MEDIUM, HIGH
+"supportedCustomFanModesList": ["silent", "turbo"],
+"supportedPresetsList":        [0, 3, 5, 6],              // NONE, BOOST, ECO, SLEEP
+"supportedCustomPresetsList":  ["freeze protection"]
+```
+
+Note `AWAY` (preset 2) is **not** advertised, and there is a **custom** preset the enum doesn't cover — so the implementation has to read both lists rather than assuming the standard enum.
 
 | Item | Description | Effort | Source |
 |---|---|---|---|
-| **Custom fan modes** (`silent`, `turbo` on Midea) | Surface as additional levels in `RotationSpeed` mapping. Define a stable ordering: `[AUTO, silent, LOW, MEDIUM, HIGH, turbo]`; preserve user intent across reboots. | 1.5 h | [ESPHome midea_ac](https://esphome.io/components/climate/midea.html) |
-| **Presets** (`eco`, `boost`, `sleep`, `away`) | Surface each as a `Service.Switch` on the same accessory. Mutually exclusive — toggling one off the others. | 2 h | — |
-| Capability filtering | Only expose switches/presets the device's `config` advertises | 30 min | — |
-| Per-preset disable flags | Same pattern as `disableHumiditySensor` etc. | 30 min | — |
-| README + CLAUDE update | Document the new switch services | 15 min | — |
+| **Custom fan modes** (`silent`, `turbo`) | ESPHome carries these in a separate `customFanMode` state field, not `fanMode`. `fanModeToSpeed` already returns `undefined` for anything outside `supportedFanModesList`, so the groundwork is in place; the open design question is whether they become extra `RotationSpeed` anchors (ordering `[silent, AUTO, LOW, MEDIUM, HIGH, turbo]` is not obviously right — `silent` and `AUTO` aren't comparable speeds) or their own switches. | 2 h | [ESPHome midea_ac](https://esphome.io/components/climate/midea.html) |
+| **Presets** (`BOOST`, `ECO`, `SLEEP` + customs) | Surface each as a `Service.Switch`, mutually exclusive, reusing the `handleModeSwitch`/`syncModeSwitches` pattern the DRY and FAN_ONLY tiles already use. | 2 h | — |
+| Capability filtering | Only expose what the device's `config` advertises, across both the enum and custom lists | 30 min | — |
+| Per-preset disable flags | Same pattern as `disableHumiditySensor` etc., default hidden like every other companion service | 30 min | — |
+| Schema bump + docs | New services mean a new `ACCESSORY_SCHEMA_VERSION`; README/CLAUDE/QA updates | 45 min | — |
 
-**Total effort:** ~5 hours. **Adds new HomeKit services** — bumps minor.
+**Total effort:** ~6 hours. **Adds new HomeKit services** — minor bump, and a schema-version bump so cached accessories are rebuilt.
 
 ---
 
