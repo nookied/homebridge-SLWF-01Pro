@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # Manual runs are an AUTH PROBE, not a release. See the "Probe" step below:
+  # it re-publishes the already-published version in package.json, so npm runs
+  # the full OIDC exchange and then rejects the upload as a duplicate. Nothing
+  # is published, and the run refuses to start if that version is not already
+  # on the registry.
+  workflow_dispatch:
 
 permissions:
   contents: write   # for `gh release create`
@@ -42,6 +48,7 @@ jobs:
         run: npm ci
 
       - name: Verify tag matches package.json version
+        if: github.event_name == 'push'
         run: |
           TAG="${GITHUB_REF_NAME#v}"
           PKG="$(node -p "require('./package.json').version")"
@@ -109,9 +116,59 @@ jobs:
       # workflow *filename* — npm matches on the filename alone, so renaming
       # this file silently breaks publishing.
       - name: Publish to npm
+        if: github.event_name == 'push'
         run: npm publish --access public
 
+      # ---- Manual auth probe (workflow_dispatch only) ---------------------
+      # Proves the OIDC path end to end without releasing anything. npm's
+      # `--dry-run` deliberately skips the token exchange (npm/cli#8525), so a
+      # real publish is the only way to test auth. Re-publishing a version that
+      # already exists is the safe way to do it: the exchange runs in full, then
+      # the registry rejects the upload as a duplicate.
+      #
+      #   403 "cannot publish over ..." -> auth WORKS
+      #   404                           -> auth BROKEN (npm reports dead or
+      #                                    unmatched auth as a missing package)
+      - name: Guard — probe version must already be published
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          NAME="$(node -p "require('./package.json').name")"
+          PKG="$(node -p "require('./package.json').version")"
+          echo "package.json: $NAME@$PKG"
+          if ! npm view "$NAME@$PKG" version > /dev/null 2>&1; then
+            echo "::error::$NAME@$PKG is NOT on the registry — a probe run would publish it for real. Aborting. Cut a real release instead, or point package.json at a published version."
+            exit 1
+          fi
+          echo "$NAME@$PKG is already published — safe to use as an auth probe."
+
+      - name: Probe — verify trusted publishing auth
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          PKG="$(node -p "require('./package.json').version")"
+          set +e
+          out="$(npm publish --access public 2>&1)"
+          rc=$?
+          set -e
+          echo "$out"
+          echo "--- npm exit code: $rc ---"
+
+          if [ $rc -eq 0 ]; then
+            echo "::error::Publish SUCCEEDED for an already-published version. That should be impossible — investigate before releasing."
+            exit 1
+          fi
+          if echo "$out" | grep -qiE 'cannot publish over|previously published'; then
+            echo "::notice::AUTH OK — npm completed the OIDC exchange and rejected the upload only because $PKG already exists. Trusted publishing is working."
+            exit 0
+          fi
+          if echo "$out" | grep -qE 'E404|404 Not Found'; then
+            echo "::error::AUTH FAILED (404). npm reports dead or unmatched auth as a missing package. Check that the trusted publisher on npmjs.com still matches this org/repo AND the workflow filename release.yml, and that registry-url is not set on setup-node."
+            exit 1
+          fi
+          echo "::error::Unrecognised publish failure — see the npm output above."
+          exit 1
+
       - name: Extract release notes from CHANGELOG
+        if: github.event_name == 'push'
         run: |
           TAG="${GITHUB_REF_NAME#v}"
           awk "/^## \\[$TAG\\]/{flag=1; next} /^## \\[/{flag=0} flag" CHANGELOG.md > release-notes.md
@@ -120,6 +177,7 @@ jobs:
           fi
 
       - name: Create GitHub Release
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
