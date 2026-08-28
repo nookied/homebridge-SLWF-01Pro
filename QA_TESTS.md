@@ -6,6 +6,22 @@ Budget: ~10 minutes per release.
 
 ---
 
+## Last walked
+
+**v1.0.0 — 2026-08-28**, against six SLWF-01Pro dongles on Homebridge 2.4.0 / HAP 2.2.2 / Node 24.20.0.
+
+| Area | Result |
+|---|---|
+| Home-app control, all six ACs | ✅ passed |
+| Fan slider does not jump; 0% = AUTO and stays | ✅ passed |
+| No `Factory reset` tile, no diagnostic sensors in HomeKit | ✅ passed (none present) |
+| Restart resilience | ✅ passed — all six UUIDs, names, schema versions and service counts identical across a Homebridge restart, all reconnected |
+| Disconnect / reconnect badge behaviour | ⏭️ not walked this release |
+| Eve history recording a graph | ⏭️ not walked — needs `disablePowerSensor: false` plus `fakegato-history` installed. The fix is covered by unit tests and was verified against the real fakegato module (constructs, `addEntry` works, persists under `homebridge.user.storagePath()`), but no Eve graph was observed. |
+| Dry / Fan Only returning an off AC to off | ⏭️ not walked — the test bench hides those tiles. Covered by `test/unit/modeSwitch.test.js` against the real code path. |
+
+Incidentally found while walking this: an AC that dropped off Wi-Fi for ten minutes logged an identical connection error every ten seconds. Fixed in 1.0.0 before release.
+
 ## 0. Pre-flight
 
 - [ ] Working from a clean `git status` on the release branch

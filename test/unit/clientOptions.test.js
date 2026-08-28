@@ -14,9 +14,11 @@ jest.mock('@2colors/esphome-native-api', () => ({
 	Client: class {
 		constructor(options) {
 			this.options = options;
+			this.handlers = {};
 			mockClientInstances.push(this);
 		}
-		on() {}
+		on(event, fn) { this.handlers[event] = fn; }
+		emit(event, payload) { if (this.handlers[event]) this.handlers[event](payload); }
 		connect() {}
 	},
 	Discovery: class {},
@@ -88,5 +90,66 @@ describe('ESPHome client options', () => {
 		await init.call(makePlatform([{ name: 'Living Room AC', host: '192.168.1.120' }]));
 
 		expect(mockClientInstances[0].options.reconnectInterval).toBeGreaterThan(0);
+	});
+});
+
+// A device that drops off the network fails every reconnect attempt for as long
+// as it stays away. On the live test bench one AC went offline for ten minutes
+// and produced ~60 identical `getaddrinfo ENOTFOUND` lines at error level.
+describe('repeated connection failures do not flood the log', () => {
+	beforeEach(() => {
+		mockClientInstances.length = 0;
+	});
+
+	function spawn() {
+		const platform = makePlatform([{ name: 'Living Room AC', host: '192.168.1.120' }]);
+		const errors = [];
+		const infos = [];
+		platform.log = Object.assign(msg => infos.push(String(msg)), {
+			error: msg => errors.push(String(msg)),
+			warn: () => {},
+			easyDebug: () => {},
+		});
+		return { platform, errors, infos };
+	}
+
+	test('the same error repeated is logged once, not every retry', async () => {
+		const { platform, errors } = spawn();
+		await init.call(platform);
+		const client = mockClientInstances[0];
+
+		for (let i = 0; i < 20; i++) {
+			client.emit('error', new Error('getaddrinfo ENOTFOUND air-conditioner-fae29f.local'));
+		}
+
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toContain('ENOTFOUND');
+	});
+
+	test('a different error still gets through', async () => {
+		const { platform, errors } = spawn();
+		await init.call(platform);
+		const client = mockClientInstances[0];
+
+		client.emit('error', new Error('read ECONNRESET'));
+		client.emit('error', new Error('read ECONNRESET'));
+		client.emit('error', new Error('getaddrinfo ENOTFOUND'));
+
+		expect(errors).toHaveLength(2);
+	});
+
+	test('reconnecting reports how many attempts failed, and re-arms logging', async () => {
+		const { platform, errors, infos } = spawn();
+		await init.call(platform);
+		const client = mockClientInstances[0];
+
+		for (let i = 0; i < 5; i++) client.emit('error', new Error('read ECONNRESET'));
+		client.emit('connected');
+
+		expect(infos.some(m => m.includes('failed attempt'))).toBe(true);
+
+		// After coming back, the same error is newsworthy again.
+		client.emit('error', new Error('read ECONNRESET'));
+		expect(errors).toHaveLength(2);
 	});
 });
