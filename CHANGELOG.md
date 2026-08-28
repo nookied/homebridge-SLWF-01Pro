@@ -9,6 +9,11 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ## [Unreleased]
 
+### Fixed
+
+- **Turning the Dry or Fan Only switch on and back off no longer starts an AC that was off.** The mode to restore was only recorded when leaving a primary mode (COOL/HEAT/AUTO/HEAT_COOL), so an AC that was **off** had nothing recorded and fell through to the cached `lastTargetState` — typically `COOL`. Toggling the switch twice therefore left the AC cooling instead of off. `OFF` is now recorded as a restore target, and the restore reads it with an explicit null check rather than a truthiness test (`ESP_MODE.OFF` is `0`, which the old `||` treated as "nothing recorded"). A stale restore target left in the accessory cache by an earlier session is also cleared at startup unless the device really did come back up in DRY or FAN_ONLY.
+- **Fan speed and swing now track the device in DRY and FAN_ONLY.** The supplementary-mode update path refreshed only Active / Target / Current state, so a fan-speed change made at the AC itself never reached HomeKit while in FAN_ONLY — the one mode where fan speed is the entire function.
+
 ### Internal
 
 - **Releases now publish to npm via GitHub OIDC [trusted publishing](https://docs.npmjs.com/trusted-publishers) instead of a long-lived `NPM_TOKEN`.** The stored token was last written 2026-05-24 and Granular Access Tokens cap at 90 days, so it had already expired; the next tagged release would have failed with a misleading `404 Not Found - PUT` (npm reports dead auth as a missing package). Trusted publishing has no expiry and no stored secret, and emits the provenance attestation itself, so `--provenance` was dropped. The release job also moved from a pinned Node `22.x` to `lts/*`, since trusted publishing needs npm >= 11.5.1 and Node 22 ships npm 10. No change to the published package.
