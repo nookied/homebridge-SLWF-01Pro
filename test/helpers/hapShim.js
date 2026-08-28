@@ -230,6 +230,7 @@ function makeFakeClimateEntity({ supportedModes = [0, 2, 3, 6], supportedFanMode
 		on(event, fn) { handlers[event] = fn; },
 		once(event, fn) { handlers[event] = fn; },
 		off() {},
+		emit(event, payload) { if (handlers[event]) handlers[event](payload); },
 	};
 }
 
