@@ -1,0 +1,21 @@
+name: Feature request
+description: Suggest a capability for the plugin
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do that you can't do today?
+    validations:
+      required: true
+  - type: textarea
+    id: device
+    attributes:
+      label: What does your device advertise?
+      description: |
+        If this is about a capability your AC supports, paste the Climate entity's
+        config from the dongle's ESPHome logs — particularly supportedModesList,
+        supportedFanModesList, supportedCustomFanModesList and supportedPresetsList.
+      render: json
+    validations:
+      required: false

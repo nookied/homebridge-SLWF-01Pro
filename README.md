@@ -2,7 +2,7 @@
 
 [Homebridge](https://homebridge.io) plugin for the **[SLWF-01Pro Wi-Fi dongle](https://smartlight.me/smart-home-devices/wifi-devices/wifi-dongle-air-conditioners-midea-idea-electrolux-for-home-assistant)** flashed with ESPHome — exposes the AC it's plugged into as a HomeKit `HeaterCooler` accessory with full mode, fan-speed and swing control.
 
-The SLWF-01Pro is a Wi-Fi dongle from **[SMLIGHT](https://smartlight.me)** (Ukraine) that drops into the proprietary serial Wi-Fi port on Midea-protocol air conditioners — replacing the OEM Tuya/SmartLife stick. Hardware revisions in the wild: **v1.1**, **v1.2** (ESP8266) and **v2.1** (ESP32); pinouts differ between revisions. Once flashed with [ESPHome](https://esphome.io) (typically the [`midea_ac`](https://esphome.io/components/climate/midea.html) component) the dongle exposes the AC as a `Climate` entity over the ESPHome native API — this plugin bridges that entity into HomeKit.
+The SLWF-01Pro is a Wi-Fi dongle from **[SMLIGHT](https://smartlight.me)** (Ukraine) that drops into the proprietary serial Wi-Fi port on Midea-protocol air conditioners — replacing the OEM Tuya/SmartLife stick. Hardware revisions in the wild: **v1.1**, **v1.2** and **v2.1** — all ESP8266 (`esp12e`) boards; the UART pinout and the flashing method differ between them, not the chip. Once flashed with [ESPHome](https://esphome.io) (typically the [`midea_ac`](https://esphome.io/components/climate/midea.html) component) the dongle exposes the AC as a `Climate` entity over the ESPHome native API — this plugin bridges that entity into HomeKit.
 
 This is a **maintained fork** of [`homebridge-esphome-ac`](https://github.com/nitaybz/homebridge-esphome-ac) by nitaybz, focused on the SLWF-01Pro use case: bug fixes, cleanup, and longer-term polish around multi-device reliability.
 
@@ -189,7 +189,11 @@ Slider drags are debounced — the plugin sends one ESPHome command 600 ms after
 
 ### Fan speed
 
-HomeKit's `RotationSpeed` (0–100%) is split evenly across the device's `supportedFanModesList`. So if your AC supports `[LOW, MEDIUM, HIGH]`, 1–33% maps to LOW, 34–66% to MEDIUM, 67–100% to HIGH. The `AUTO` fan mode (if supported) is selected when you set rotation speed to 0.
+HomeKit's `RotationSpeed` is a 0-100 % slider; ESPHome exposes a discrete list of fan modes. Each mode gets one evenly spaced anchor, with the **slowest mode at 0 %** and the **fastest at 100 %**, and the slider's step size is the coarsest value that lands exactly on every anchor. So a device advertising `[LOW, MEDIUM, HIGH]` gets detents at 0 / 50 / 100 %, and `[AUTO, LOW, MEDIUM, HIGH, QUIET]` gets 0 / 25 / 50 / 75 / 100 %. When the mode count doesn't divide 100 evenly (four modes, for example) the slider is left free rather than advertising detents the reported values would miss.
+
+Most SLWF-01Pro devices report `[AUTO, LOW, MEDIUM, HIGH]`, so **0 % selects the AC's own AUTO fan mode** — HomeKit has no separate "auto" anchor to put it on. If you'd rather not have a fan slider at all, there's no separate toggle for it; it only appears when the device advertises more than one fan mode.
+
+Midea units also advertise **custom** fan modes (`silent`, `turbo`) that HomeKit has nowhere to put. The plugin doesn't expose them, and if you select one from the AC's own remote the HomeKit slider simply keeps its last value rather than reporting something misleading.
 
 ### Swing
 
@@ -234,9 +238,26 @@ If you upgraded from `homebridge-slwf-01pro@0.1.x`, the platform identifier rena
 These are device-side issues, not plugin bugs — listed here so you know what to expect:
 
 - **Intake-mounted temperature sensor reads warm/cold air, not room temp.** HomeKit will show a value that's a few degrees off the actual room. Mitigation: ESPHome's [`midea_ac.follow_me`](https://esphome.io/components/climate/midea.html) action pushes an external Home Assistant sensor reading into the AC, but it's a Home-Assistant-only feature and (on some Senville/Midea units) requires a small hardware mod soldering IO13 to the display board's "Rec 1 OUT" pin.
-- **Pinout differs between v1.1, v1.2 and v2.1** of the dongle. Wrong YAML for your hardware revision means no UART communication. Check the SMLIGHT product page for the matching firmware before flashing.
+- **Pinout differs between v1.1, v1.2 and v2.1** of the dongle. Wrong YAML for your hardware revision means no UART communication — the dongle will join Wi-Fi and appear in Homebridge, but the AC won't respond. See [Dongle firmware](#dongle-firmware) below.
 - **Outdoor temperature and humidity setpoint** are model-specific (e.g. Midea Mission II doesn't expose them); expect them to be missing on most installs.
 - **Newer Midea firmwares** with proprietary key exchange may refuse to talk to the dongle. SMLIGHT's compatibility list is the source of truth.
+
+## Dongle firmware
+
+**This plugin does not flash firmware, and deliberately so.** Picking the wrong build for your hardware revision leaves the dongle on Wi-Fi but unable to talk to the AC, and recovering from that can mean opening the unit up. Flashing is also nothing to do with bridging an existing device into HomeKit — the ESPHome native API this plugin speaks has no firmware-upload mechanism at all. Use SMLIGHT's own tools:
+
+- **[SMLIGHT's web flasher](https://smlight.tech/flasher/#slwf01proV2)** — hold the button on the dongle, connect over USB Type-C, pick your revision. v2.1 has the Type-C port; v1.1/v1.2 are flashed over their serial header.
+- **[The official ESPHome configs](https://github.com/smlight-tech/slwf-01pro-esphome)** — `slwf01pro_v1.1.yaml` covers v1.1 and v1.2, `slwf01pro_v2.1.yaml` covers v2.1. Compile and flash with ESPHome if you want to customise entity names or add the IR "Follow me" action.
+- **[SMLIGHT's update manual](https://smlight.tech/support/manuals/books/slwf-01pro/page/device-update)**.
+
+Current SMLIGHT firmware (project version **2.4**) adds ESPHome's `update: http_request` component, which checks SMLIGHT's manifest every six hours and can update **itself** over the air. If your dongles are on that firmware they keep themselves current with no help from this plugin — which is the other reason the plugin has no business doing it.
+
+Two things worth knowing:
+
+- **Check what you're running.** The plugin reports the dongle's ESPHome version as the accessory's **Firmware Revision** in the Home app (Settings → the accessory → scroll down). The dongle's own web page at `http://<device-ip>/` shows its project version.
+- **Updating is usually optional.** The plugin talks to any ESPHome version that exposes a `Climate` entity; there's no minimum. Newer firmware mainly buys you self-updating and any fixes SMLIGHT has made to the Midea protocol handling. If your AC responds correctly today, there is no plugin-side reason to reflash.
+
+If a device is running firmware that exposes an ESPHome `Update` entity, the plugin ignores it rather than surfacing it in HomeKit — a tap-to-flash tile sitting next to your AC controls is not a good idea.
 
 ## Troubleshooting
 
@@ -315,7 +336,7 @@ npm run lint
 npm test
 node -e "require('./index.js')"                 # smoke test
 npm pack --dry-run                              # sanity-check tarball contents
-npm version patch                               # or: npm version minor / npm version 0.5.7
+npm version patch                               # or: npm version minor / npm version 1.0.1
 git push --follow-tags                          # release.yml publishes npm + GitHub Release
 ```
 

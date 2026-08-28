@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Dongle firmware, flashing, or wiring
+    url: https://smlight.tech/support/manuals/books/slwf-01pro
+    about: Questions about flashing the SLWF-01Pro or which YAML matches your hardware revision belong with SMLIGHT.
+  - name: ESPHome climate component
+    url: https://esphome.io/components/climate/midea.html
+    about: Questions about the midea_ac component itself.

@@ -13,7 +13,7 @@ This file is the canonical persistent memory for this project. Use [DOCS.md](DOC
 **Repo:** [`https://github.com/nookied/homebridge-SLWF-01Pro`](https://github.com/nookied/homebridge-SLWF-01Pro) — **maintained fork**
 **Original (upstream):** [`nitaybz/homebridge-esphome-ac`](https://github.com/nitaybz/homebridge-esphome-ac) — last release 0.0.4. The fork is fully independent; an `upstream` git remote is not required for normal work and should only be used temporarily for reference.
 **License:** MIT (preserved from original)
-**Current version:** **0.5.7** — published to npm on 2026-05-24. Further fixes are staged unreleased on `master`; see the `[Unreleased]` section of `CHANGELOG.md`. 181 unit tests passing across 10 suites. CI on Node 22 / 24 / 26. Tag-driven release pipeline publishing via npm trusted publishing (OIDC, no token). `ACCESSORY_SCHEMA_VERSION = 6`.
+**Current version:** **1.0.0** — the first stable release, prepared for a Homebridge Verified application. 206 unit tests passing across 12 suites. CI on Node 22 / 24 / 26. Tag-driven release pipeline publishing via npm trusted publishing (OIDC, no token). `ACCESSORY_SCHEMA_VERSION = 6`.
 **Engines:** Homebridge `^1.8.0 || ^2.0.0`; Node `^22.0.0 || ^24.0.0 || ^26.0.0` (Node 18 and 20 are EOL and were dropped alongside the eslint 10 upgrade, which requires Node >= 20.19)
 
 > **Pairing status (resolved enough to use):** The child-bridge pairing issue from the 0.4.x audit was addressed across 0.4.4 → 0.5.1. The user successfully paired and sees devices. The fix bundle: Eve power moved off the `HeaterCooler` service onto a linked, hidden `Service.Outlet` (0.4.4); companion services hidden by default to keep visible service count down (0.5.0); ConfiguredName preserved across restarts so Apple Home renames stick (0.5.1); auto-discovered offline devices no longer pruned so Apple Home identity survives reboots (0.5.1). 0.5.2 removed empty Homebridge UI row log noise. 0.5.3 added capability-aware restore mode, ConfiguredName seeding for newly-enabled cached companion services, current-temperature clamping, and a non-destructive prune guard for invalid hostless manual entries. 0.5.4–0.5.6 attempted progressively stronger forced clears for sticky `StatusFault` warnings. 0.5.7 changes strategy: the plugin no longer exposes optional `StatusActive` / `StatusFault` transport-health characteristics, because Apple Home can cache them too aggressively; writes still return clean communication errors while disconnected. 0.5.7 also uses cached auto-discovered hosts as fallback connection targets when mDNS misses a scan. Per-device disable flags now override platform defaults *bidirectionally* (0.5.0). The maintained pairing/network diagnostic flow lives in `QA_TESTS.md` section 7.
@@ -23,9 +23,15 @@ This file is the canonical persistent memory for this project. Use [DOCS.md](DOC
 The **SLWF-01Pro** is a small Wi-Fi control module from **SMLIGHT** (smartlight.me, Ukraine) that plugs into the proprietary serial Wi-Fi port found inside Midea-protocol mini-split air conditioners. It replaces the OEM Tuya/SmartLife stick; once flashed with ESPHome (typically the [`midea_ac`](https://esphome.io/components/climate/midea.html) component) the AC becomes a local-network climate entity instead of a Tuya-cloud-only device.
 
 Hardware revisions in the wild:
-- **v1.1** — ESP8266, original pinout
-- **v1.2** — ESP8266, TX/RX swapped vs v1.1
-- **v2.1** — ESP32, different again
+- **v1.1** — ESP8266 (`esp12e`), original pinout
+- **v1.2** — ESP8266 (`esp12e`), TX/RX swapped vs v1.1; shares SMLIGHT's `slwf01pro_v1.1.yaml`
+- **v2.1** — ESP8266 (`esp12e`) as well, plus a USB Type-C port for flashing and an IR "Follow me" pad. Its `slwf01pro_v2.1.yaml` adds a `follow_me` API action.
+
+All three revisions are ESP8266 `esp12e` boards — verified against SMLIGHT's
+[official ESPHome configs](https://github.com/smlight-tech/slwf-01pro-esphome), where both
+YAMLs declare `esp8266: board: esp12e`. (Earlier revisions of this file claimed v2.1 was
+ESP32; that was wrong.) The practical difference between revisions is the UART pinout and
+how you flash them, not the SoC.
 
 Wrong YAML for the hardware revision = no UART communication; this is a common support question on the SMLIGHT forum but not the plugin's problem to solve.
 
@@ -87,6 +93,7 @@ homebridge-SLWF-01Pro/
 │   │   └── dedupeDevices(list)                 Deduped by host (case-insensitive), falls back to address
 │   │
 │   ├── classifyEntity.js                 Pure entity → HomeKit-service-slot classifier
+│   │   ├── isExposable(entity)                 Refuses config/diagnostic entities, unsafe deviceClasses, disabledByDefault
 │   │   ├── classifyEntity(entity)              ESPHome entity → 'climate' | 'humiditySensor' | 'outdoorTempSensor'
 │   │   │                                          | 'powerSensor' | 'beeperSwitch' | 'displayButton' | null
 │   │   └── bundleEntities(entities[])          Returns {climate?, humiditySensor?, ...} (first match wins)
@@ -107,7 +114,9 @@ homebridge-SLWF-01Pro/
 │   │   ├── removeConnectionStatusCharacteristics()
 │   │   │                                      Remove cached StatusActive/StatusFault from HeaterCooler (schema v6)
 │   │   ├── clampTargetTemperature(value)       Non-mutating clamp to [visualMin, visualMax]
-│   │   └── updateClimateState(state)           ESPHome 'state' event → all HAP characteristics
+│   │   ├── guarded(label, fn)                  Wraps every transport listener so a throw is logged, not unhandled
+│   │   ├── updateAirflowCharacteristics()      Shared RotationSpeed/SwingMode refresh (both mode paths)
+│   │   └── updateClimateState(state)           ESPHome 'state' event → all HAP characteristics; ignores malformed payloads
 │   │
 │   ├── stateManager.js                   HomeKit .onSet handlers (per-instance debouncer)
 │   │   ├── sendState(that)                     Per-device debounced send (600 ms) via that.esphome.connection.climateCommandService
@@ -126,8 +135,9 @@ homebridge-SLWF-01Pro/
 │   │   ├── pickAutoMode(list)                      AUTO if available, else HEAT_COOL, else null
 │   │   ├── supportsCool(list) / supportsHeat(list) Treats HEAT_COOL & AUTO as supporting both
 │   │   ├── pickDefaultSwingValue(list)             BOTH > VERTICAL > HORIZONTAL
-│   │   ├── fanSpeedToFanMode(speed, list)          0–100% → discrete fan-modes index
-│   │   ├── fanModeToSpeed(fanMode, list)           Discrete fan mode → 0–100%
+│   │   ├── fanSpeedToFanMode(speed, list)          0–100% → nearest fan-mode anchor
+│   │   ├── fanModeToSpeed(fanMode, list)           Fan mode → its anchor %; undefined for custom/unknown modes
+│   │   ├── fanSpeedMinStep(list)                   Coarsest RotationSpeed step landing on every anchor
 │   │   └── chooseInitialTargetMode(stateMode)      Initial cached state for new accessories
 │   │
 │   ├── eve.js                            Eve.app custom characteristic factory
@@ -155,7 +165,12 @@ homebridge-SLWF-01Pro/
 │       ├── pruning.test.js               pruneOrphanedAccessories: skip when autoDiscover on, prune when off (4 tests)
 │       ├── looksLikeRealEntry.test.js    Empty UI-row filtering + invalid manual config prune guard (10 tests)
 │       ├── modeSwitch.test.js            handleModeSwitch: DRY/FAN_ONLY restore targets, incl. returning to OFF (9 tests)
-│       └── clientOptions.test.js         Pins the ESPHome Client options — above all clearSession: false (5 tests)
+│       ├── clientOptions.test.js         Pins the ESPHome Client options — above all clearSession: false (5 tests)
+│       ├── eveHistory.test.js            fakegato is called as a FACTORY and writes under storagePath (7 tests)
+│       └── errorHandling.test.js         Throwing/malformed state payloads stay contained (3 tests)
+│
+├── test/helpers/
+│   └── hapShim.js                        Shared fake HAP/Homebridge shim (not collected as a suite)
 │
 ├── .github/workflows/
 │   ├── ci.yml                            Lint + tests + smoke on Node 22 / 24 / 26, every push + PR
@@ -242,7 +257,7 @@ The `@2colors/esphome-native-api` exposes ESPHome's protobuf API. Climate entiti
 | `HeatingThresholdTemperature` | `clampTargetTemperature(state.targetTemperature)` | Bounds from `visualMinTemperature`/`visualMaxTemperature`. Only added if HEAT or AUTO supported. |
 | `CoolingThresholdTemperature` | same | Only added if COOL or AUTO supported. |
 | `SwingMode` | `state.swingMode ? 1 : 0` | Only added if `supportedSwingModesList.length > 1`. Picks first available direction (BOTH > VERT > HORIZ). |
-| `RotationSpeed` | `fanModeToSpeed(state.fanMode, list)` | Only added if more than one fan mode supported. 0–100% split evenly across the modes list. |
+| `RotationSpeed` | `fanModeToSpeed(state.fanMode, list)` | Only added if more than one fan mode supported. Each mode gets an evenly spaced anchor, slowest at 0% and fastest at 100%; `fanSpeedMinStep` picks the coarsest step landing on all of them. Custom fan modes (`silent`/`turbo`) return `undefined` so HomeKit keeps its last value. |
 
 ### Mode write semantics (`stateManager.set.TargetHeaterCoolerState`)
 
@@ -364,6 +379,7 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 
 - **`clearSession: false` on the ESPHome `Client` is load-bearing.** The client destroys and recreates its entity objects on reconnect *only* when `clearSession` is true. `DeviceAccessory` binds its `'state'` listeners to those objects exactly once, and `esphome.js`'s `'initialized'` handler deliberately early-returns on reconnect — so flipping the flag would leave the plugin holding destroyed entities, and HomeKit would silently stop receiving updates after the first reconnect. Pinned by `test/unit/clientOptions.test.js`.
 - **`fakegato-history` is an optional peer dependency, not a dependency.** It hard-depends on `googleapis` (~194 MB) for a Google Drive storage backend this plugin never uses, and that tree carried the package's only production advisory. It is declared under `peerDependencies` with `peerDependenciesMeta.optional: true`, so npm does **not** install it automatically. Live power readings work without it; only the Eve history graph needs it. `lib/DeviceAccessory.js` `try/catch`-wraps the `require` and warns once per Homebridge run when power monitoring is enabled but the module is missing.
+- **`fakegato-history` must be called as a FACTORY.** `require('fakegato-history')` returns `function (pHomebridge) { …; return FakeGatoHistory }` — call it with the Homebridge api and `new` the *result*. Calling `new` on the factory itself sets fakegato's internal `homebridge` to the first argument and throws on `homebridge.hap`. That is what the plugin did until 1.0.0, and because the throw was caught at `easyDebug` level, Eve history silently never worked. Pinned by `test/unit/eveHistory.test.js`.
 - **The declared floor for `@2colors/esphome-native-api` is `^1.3.6`.** It was `^1.2.3` while the lockfile pinned 1.2.3, so CI tested a client three years older than the one users resolved to. The API surface the plugin touches (`climateCommandService`, `Discovery`, and the `deviceInfo` fields) is unchanged between the two.
 
 ## Working rules (for this repo)
@@ -419,7 +435,9 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 | `DOCS.md` | Documentation index and update process |
 | `CHANGELOG.md` | Release history (Keep a Changelog) |
 | `ROADMAP.md` | Development plan (M1–M5) |
-| `test/unit/*.test.js` | Jest unit tests (181 currently across 10 suites) |
+| `test/unit/*.test.js` | Jest unit tests (206 currently across 12 suites) |
+| `test/helpers/hapShim.js` | Shared fake HAP/Homebridge shim used by the accessory suites |
+| `.github/ISSUE_TEMPLATE/` | Bug/feature forms (Homebridge Verified expects issues enabled and usable) |
 | `QA_TESTS.md` | Manual pre-release checklist |
 | `AGENTS.md` | Pointer to this file |
 | `CLAUDE.md` | This file — project memory |

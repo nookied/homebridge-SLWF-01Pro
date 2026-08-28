@@ -1,0 +1,63 @@
+name: Bug report
+description: Something isn't working with the plugin
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, please confirm the AC works from the ESPHome web interface
+        on the dongle itself (`http://<device-ip>/`). If it does not respond there,
+        the problem is in the dongle's firmware or its UART wiring, not this plugin.
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: homebridge-version
+    attributes:
+      label: Homebridge version
+      placeholder: "2.4.0"
+    validations:
+      required: true
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      placeholder: "24.20.0"
+    validations:
+      required: true
+  - type: input
+    id: esphome-version
+    attributes:
+      label: ESPHome version on the dongle
+      description: Shown in the Home app as the accessory's Firmware Revision, or on the dongle's web page.
+      placeholder: "2024.4.2"
+    validations:
+      required: false
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Homebridge log
+      description: |
+        Set `"debug": true` in the platform config and restart, then paste the
+        lines from startup through the problem. Redact your encryption key.
+      render: shell
+    validations:
+      required: false
+  - type: textarea
+    id: config
+    attributes:
+      label: Your platform config
+      description: The SLWFOnePro block from config.json, with any encryption key removed.
+      render: json
+    validations:
+      required: false

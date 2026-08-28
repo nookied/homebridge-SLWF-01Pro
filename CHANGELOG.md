@@ -7,7 +7,13 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 
 ---
 
-## [Unreleased]
+## [1.0.0] — 2026-08-28
+
+First stable release. The public API — the `SLWFOnePro` platform identifier, every config key, and the HomeKit accessory shape — is what 0.5.x already shipped, so upgrading needs no config changes. From here the project follows strict [SemVer](https://semver.org/).
+
+This release is also the cleanup pass done in preparation for a [Homebridge Verified](https://github.com/homebridge/plugins/wiki/Verified-Plugins) application: unhandled exceptions are contained, config and diagnostic entities can no longer reach HomeKit, history is written under the Homebridge storage directory, and the repository now has issues enabled with templates.
+
+**Node 18 and 20 are no longer supported** — see Changed below.
 
 ### Fixed
 
@@ -15,6 +21,8 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 - **Eve energy history now actually works.** `fakegato-history` exports a *factory* that must be called with the Homebridge api; the plugin was calling `new` on the factory itself, which set fakegato's internal homebridge reference to the string `'energy'` and then threw on `homebridge.hap`. The throw was caught and logged at debug level, so the history service was never created and no one was told — Eve showed live wattage but never a graph. The factory is now invoked correctly, and a failure here logs a warning instead of disappearing. History is written under `homebridge.user.storagePath()`, as Homebridge requires of plugins that persist to disk.
 - **The fan-speed slider no longer reports values HomeKit can't select.** Each fan mode now sits on an evenly spaced anchor with the slowest at 0% and the fastest at 100%, and `RotationSpeed.minStep` is the coarsest step that lands on every one of them. Previously a mode was reported at the *top* of its band (computed with `ceil`) while `minStep` was sized with `floor`, so on a device advertising `[LOW, MEDIUM, HIGH]` every reachable slider position snapped somewhere else (0→34, 33→34, 66→67, 99→100) and 100% could not be selected at all. On the common `[AUTO, LOW, MEDIUM, HIGH]` list, 0% now means AUTO in both directions instead of jumping to 25%.
 - **A custom fan mode no longer resets the fan speed.** Midea devices report `silent`/`turbo` outside `supportedFanModesList`; the plugin mapped anything unrecognised to 0%, which read back as the first mode. Unknown modes now leave the HomeKit value untouched.
+- **Config and diagnostic entities can no longer reach HomeKit.** Companion entities are now refused unless ESPHome reports `entityCategory: 0`, and refused outright for the `restart`/`reboot`/`update`/`identify` device classes or when the ESPHome config marks them `disabledByDefault`. Real SLWF-01Pro firmware exposes a `Factory reset` button (config category, `restart` class) right next to the `Display Toggle` button the plugin does map; previously only the absence of the word "display" in its name kept it out of the Home app.
+- **A failure inside an ESPHome state listener can no longer escape.** Those events arrive outside any HomeKit call stack, so a throw became an unhandled exception. Every listener the accessory attaches is now wrapped, logged and contained. `updateClimateState` also ignores a malformed payload rather than adopting it — `state` is what outgoing commands are built from, so assigning `null` would have poisoned the next write too.
 - **Fan speed and swing now track the device in DRY and FAN_ONLY.** The supplementary-mode update path refreshed only Active / Target / Current state, so a fan-speed change made at the AC itself never reached HomeKit while in FAN_ONLY — the one mode where fan speed is the entire function.
 
 ### Changed
@@ -28,7 +36,9 @@ This package is a maintained fork of [`homebridge-esphome-ac`](https://github.co
 - **Releases now publish to npm via GitHub OIDC [trusted publishing](https://docs.npmjs.com/trusted-publishers) instead of a long-lived `NPM_TOKEN`.** The stored token was last written 2026-05-24 and Granular Access Tokens cap at 90 days, so it had already expired; the next tagged release would have failed with a misleading `404 Not Found - PUT` (npm reports dead auth as a missing package). Trusted publishing has no expiry and no stored secret, and emits the provenance attestation itself, so `--provenance` was dropped. The release job also moved from a pinned Node `22.x` to `lts/*`, since trusted publishing needs npm >= 11.5.1 and Node 22 ships npm 10. No change to the published package.
 - **`release.yml` gained a manual auth probe.** `workflow_dispatch` re-publishes the already-published version so npm runs the full OIDC exchange and then rejects the upload as a duplicate, proving the release path works without releasing anything. A guard refuses to run unless that version is already on the registry.
 - **Tooling refresh:** eslint 8 → 10 (with the `.eslintrc.json` + `.eslintignore` pair replaced by a flat `eslint.config.mjs`), jest 29 → 30, and GitHub Actions `checkout`/`setup-node` v4 → v7 (v4 targets the deprecated Node 20 runtime). `npm audit` now reports **0 vulnerabilities**, down from 5 (3 high, 1 moderate, 1 low).
-- Added `test/unit/modeSwitch.test.js` and `test/unit/clientOptions.test.js`; the latter pins `clearSession: false`, which is load-bearing for reconnect behaviour and was previously uncovered. 181 tests across 10 suites.
+- Declared the `supports-hap` keyword, enabled GitHub Issues (they had been disabled, which on its own would have blocked verification) and added bug-report/feature-request templates.
+- Corrected a long-standing hardware claim in the docs: **all three SLWF-01Pro revisions are ESP8266 `esp12e` boards**, not just v1.1/v1.2. Verified against SMLIGHT's official ESPHome configs, where both YAMLs declare `esp8266: board: esp12e`. README gains a *Dongle firmware* section covering flashing, the self-updating `update: http_request` component in current SMLIGHT firmware (project 2.4), and why this plugin does not and will not flash firmware itself.
+- Added `test/unit/modeSwitch.test.js` and `test/unit/clientOptions.test.js`; the latter pins `clearSession: false`, which is load-bearing for reconnect behaviour and was previously uncovered. 206 tests across 12 suites, with the fake HAP shim extracted to `test/helpers/hapShim.js` and `classifyEntity` checked against an entity list captured from live hardware.
 
 ---
 
