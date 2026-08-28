@@ -114,14 +114,13 @@ describe('config.schema.json', () => {
 		const referenced = [];
 		layout.forEach(entry => collectKeys(entry, referenced));
 
-		for (const ref of referenced) {
-			if (ref.startsWith('devices[].')) {
-				const fieldName = ref.slice('devices[].'.length);
-				expect(devicesProps.has(fieldName)).toBe(true);
-			} else {
-				expect(platformProps.has(ref)).toBe(true);
-			}
-		}
+		const missing = referenced.filter(ref => (
+			ref.startsWith('devices[].')
+				? !devicesProps.has(ref.slice('devices[].'.length))
+				: !platformProps.has(ref)
+		));
+
+		expect(missing).toEqual([]);
 	});
 
 	test('discoveryTimeout has a working condition that depends on autoDiscover', () => {

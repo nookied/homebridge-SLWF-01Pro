@@ -154,6 +154,14 @@ Per ESPHome device, all of these services land on a single HomeKit accessory if 
 
 Entities the plugin deliberately ignores: Wi-Fi RSSI, Uptime, Factory Reset (dangerous to expose).
 
+**Eve history is optional and not installed by default.** Live wattage works out of the box. The historical graph in Eve.app needs [`fakegato-history`](https://github.com/simont77/fakegato-history), which is declared as an *optional peer dependency* because it hard-depends on `googleapis` (~194 MB) for a storage backend this plugin never uses. To enable history, install it alongside the plugin and restart Homebridge:
+
+```bash
+npm install -g fakegato-history
+```
+
+The plugin logs a one-time notice if power monitoring is enabled without it.
+
 Power monitoring is intentionally isolated in a linked, hidden Outlet service rather than attached directly to the HeaterCooler service. The Outlet doesn't render as a separate tile in Apple Home (it's marked hidden, so Home skips it), but Eve.app and other HAP-direct clients still see the service in the database and can read `CurrentPowerConsumption`. This keeps the primary AC tile limited to standard HeaterCooler characteristics, which is friendlier to Apple Home during bridge pairing.
 
 ESPHome connection loss is handled at command time: while the native API client is disconnected, HomeKit writes fail with a standard communication error and normal control resumes on reconnect. The plugin deliberately does not expose the optional HAP `StatusFault` transport-health characteristic because Apple Home can cache that value aggressively and keep showing a stale warning after the device is healthy again.

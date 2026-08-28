@@ -23,8 +23,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
+      # setup-node v5+ auto-caches when package.json carries a `packageManager`
+      # field. Ours does not, and `cache: npm` below is explicit, so behaviour is
+      # unchanged — but if `packageManager` is ever added, set
+      # `package-manager-cache: false` or expect double caching.
+      #
       # `node-version: lts/*` (not a pinned 22.x) is required: trusted
       # publishing needs npm >= 11.5.1, and Node 22 ships npm 10. The
       # explicit assert below catches it if lts/* ever moves backwards.
@@ -39,7 +44,7 @@ jobs:
       # default registry anyway, so nothing is lost by omitting it.
       # See actions/setup-node#1551 and npm/documentation#1960.
       - name: Set up Node (lts/*)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: lts/*
           cache: npm

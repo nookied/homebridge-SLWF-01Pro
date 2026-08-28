@@ -13,8 +13,8 @@ This file is the canonical persistent memory for this project. Use [DOCS.md](DOC
 **Repo:** [`https://github.com/nookied/homebridge-SLWF-01Pro`](https://github.com/nookied/homebridge-SLWF-01Pro) — **maintained fork**
 **Original (upstream):** [`nitaybz/homebridge-esphome-ac`](https://github.com/nitaybz/homebridge-esphome-ac) — last release 0.0.4. The fork is fully independent; an `upstream` git remote is not required for normal work and should only be used temporarily for reference.
 **License:** MIT (preserved from original)
-**Current version:** **0.5.7** — local patch prepared; not yet published unless the current agent publishes it. 167 unit tests passing across 8 suites. CI on Node 18.20.4 / 20.15.1 / 22.x / 24.x. Tag-driven release pipeline. `ACCESSORY_SCHEMA_VERSION = 6`.
-**Engines:** Homebridge `^1.8.0 || ^2.0.0`; Node `^18.20.4 || ^20.15.1 || ^22.0.0 || ^24.0.0`
+**Current version:** **0.5.7** — published to npm on 2026-05-24. Further fixes are staged unreleased on `master`; see the `[Unreleased]` section of `CHANGELOG.md`. 181 unit tests passing across 10 suites. CI on Node 22 / 24 / 26. Tag-driven release pipeline publishing via npm trusted publishing (OIDC, no token). `ACCESSORY_SCHEMA_VERSION = 6`.
+**Engines:** Homebridge `^1.8.0 || ^2.0.0`; Node `^22.0.0 || ^24.0.0 || ^26.0.0` (Node 18 and 20 are EOL and were dropped alongside the eslint 10 upgrade, which requires Node >= 20.19)
 
 > **Pairing status (resolved enough to use):** The child-bridge pairing issue from the 0.4.x audit was addressed across 0.4.4 → 0.5.1. The user successfully paired and sees devices. The fix bundle: Eve power moved off the `HeaterCooler` service onto a linked, hidden `Service.Outlet` (0.4.4); companion services hidden by default to keep visible service count down (0.5.0); ConfiguredName preserved across restarts so Apple Home renames stick (0.5.1); auto-discovered offline devices no longer pruned so Apple Home identity survives reboots (0.5.1). 0.5.2 removed empty Homebridge UI row log noise. 0.5.3 added capability-aware restore mode, ConfiguredName seeding for newly-enabled cached companion services, current-temperature clamping, and a non-destructive prune guard for invalid hostless manual entries. 0.5.4–0.5.6 attempted progressively stronger forced clears for sticky `StatusFault` warnings. 0.5.7 changes strategy: the plugin no longer exposes optional `StatusActive` / `StatusFault` transport-health characteristics, because Apple Home can cache them too aggressively; writes still return clean communication errors while disconnected. 0.5.7 also uses cached auto-discovered hosts as fallback connection targets when mDNS misses a scan. Per-device disable flags now override platform defaults *bidirectionally* (0.5.0). The maintained pairing/network diagnostic flow lives in `QA_TESTS.md` section 7.
 
@@ -41,11 +41,11 @@ Compatible AC brands (per SMLIGHT): Midea, Idea, Electrolux, Beko, Neoclima, Bos
   All three together mean the two plugins can run **alongside each other** on the same Homebridge with full auto-discovery, no interference.
 - The `upstream` git remote was **removed as project policy** in v0.2.0. The fork is intentionally divergent; the upstream's release cadence (last release ~2 years ago) doesn't justify the round-trip. If a local checkout temporarily has an `upstream` remote for reference, do not treat it as part of the release state.
 - `package.json` `repository.url` MUST point at this fork (`git+https://github.com/nookied/homebridge-SLWF-01Pro.git`). npm sigstore provenance is strict — a mismatch causes `npm publish` to fail with HTTP 422 (warmup4ie hit this once).
-- CI runs lint + tests + smoke on Node 18/20/22/24 for every push (`.github/workflows/ci.yml`). Releases are tag-driven: `npm version patch|minor|major && git push --follow-tags` triggers `release.yml`, which publishes to npm and creates a GitHub Release. See [Release & npm publishing](#release--npm-publishing) below.
+- CI runs lint + tests + smoke on Node 22/24/26 for every push (`.github/workflows/ci.yml`). Releases are tag-driven: `npm version patch|minor|major && git push --follow-tags` triggers `release.yml`, which publishes to npm and creates a GitHub Release. See [Release & npm publishing](#release--npm-publishing) below.
 
 ### Release & npm publishing
 
-- `.github/workflows/ci.yml` — lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x, every push and PR.
+- `.github/workflows/ci.yml` — lint + tests + smoke on Node 22 / 24 / 26, every push and PR.
 - `.github/workflows/release.yml` — tag-driven (`v*`). Verifies the tag matches `package.json` version, runs lint + tests + smoke, publishes to npm, then creates a GitHub Release from the matching `CHANGELOG.md` section.
 - **No npm secret is required.** Publishing uses npm **trusted publishing** (GitHub OIDC), configured on npmjs.com under the package's *Trusted Publisher* settings: org `nookied`, repo `homebridge-SLWF-01Pro`, workflow filename `release.yml`, environment blank. The workflow's `id-token: write` permission is the only credential in the path. Provenance is generated automatically — **do not re-add `--provenance`**.
   - This replaced a long-lived Granular Access Token. The repo's `NPM_TOKEN` secret was last written 2026-05-24 and Granular Access Tokens cap at 90 days, putting expiry around **2026-08-22** — already past, so the next tagged release would have failed with **`404 Not Found - PUT`**. npm reports a dead or unauthorized token as a missing package, so a 404 on publish means *auth*, not a missing package. (`homebridge-warmup-v2` hit exactly this on its v3.12.0 release.) Trusted publishing has no expiry, so this cannot recur. The dead `NPM_TOKEN` secret is left in the repo but is no longer read by anything.
@@ -100,7 +100,7 @@ homebridge-SLWF-01Pro/
 │   │   ├── addModeSwitchServices()             Service.Switch for DRY + FAN_ONLY (mutually exclusive with primary mode)
 │   │   ├── removeDisabledServices()            Honour disable* flags AND missing entities (cached cleanup)
 │   │   ├── attachOptionalEntityListeners()     Bind ESPHome 'state' events for sensors / switches / power
-│   │   ├── attachPowerService()                Linked Outlet service with Eve.Energy CurrentPowerConsumption + optional fakegato-history
+│   │   ├── attachPowerService()                Linked Outlet service with Eve.Energy CurrentPowerConsumption + optional fakegato-history (optional peer dep; warns once if absent)
 │   │   ├── handleModeSwitch(targetMode, on)    DRY/FAN_ONLY toggle handler — sets/restores mode via stateManager.sendState
 │   │   ├── syncModeSwitches(currentMode)       Reflect device's actual mode back into the supplementary switches
 │   │   ├── setConnectedStatus(connected)       Track ESPHome client reachability for clean HomeKit write failures
@@ -153,11 +153,13 @@ homebridge-SLWF-01Pro/
 │       │                                   capability-aware initial mode, RotationSpeed.minStep, schema-version
 │       │                                   single-sourcing, bidirectional per-device override
 │       ├── pruning.test.js               pruneOrphanedAccessories: skip when autoDiscover on, prune when off (4 tests)
-│       └── looksLikeRealEntry.test.js    Empty UI-row filtering + invalid manual config prune guard (10 tests)
+│       ├── looksLikeRealEntry.test.js    Empty UI-row filtering + invalid manual config prune guard (10 tests)
+│       ├── modeSwitch.test.js            handleModeSwitch: DRY/FAN_ONLY restore targets, incl. returning to OFF (9 tests)
+│       └── clientOptions.test.js         Pins the ESPHome Client options — above all clearSession: false (5 tests)
 │
 ├── .github/workflows/
-│   ├── ci.yml                            Lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x, every push + PR
-│   └── release.yml                       Tag-driven (`v*`); npm publish via OIDC trusted publishing (no token) + GitHub Release
+│   ├── ci.yml                            Lint + tests + smoke on Node 22 / 24 / 26, every push + PR
+│   └── release.yml                       Tag-driven (`v*`) + manual auth probe; npm publish via OIDC trusted publishing + GitHub Release
 │
 ├── package.json                          scripts: lint / lint:fix / test / test:all
 ├── config.schema.json                    Homebridge UI form-based config editor (autoDiscover + per-device disable flags)
@@ -170,7 +172,7 @@ homebridge-SLWF-01Pro/
 ├── CLAUDE.md                             This file — project memory
 ├── AGENTS.md                             Pointer → CLAUDE.md
 ├── LICENSE                               MIT
-└── .eslintrc.json                        ESLint legacy-config (eslint:recommended; tabs; jest env)
+└── eslint.config.mjs                     ESLint 10 flat config (eslint:recommended; tabs; jest globals scoped to test/)
 ```
 
 ## How it runs
@@ -358,6 +360,12 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 - **No upstream PR-back.** The fork is intentionally divergent and the upstream's release cadence (last release ~2 years ago) doesn't justify the round-trip.
 - **AUTO fan mode == 0 % rotation speed.** HomeKit's `RotationSpeed` characteristic has no separate "auto" anchor, so the plugin maps 0 % to ESPHome's AUTO fan mode (when supported). Documented; users wanting a strict "off" semantics can hide the fan slider via `disableFanOnlyMode` and the dry/fan_only switches.
 
+## Dependency notes
+
+- **`clearSession: false` on the ESPHome `Client` is load-bearing.** The client destroys and recreates its entity objects on reconnect *only* when `clearSession` is true. `DeviceAccessory` binds its `'state'` listeners to those objects exactly once, and `esphome.js`'s `'initialized'` handler deliberately early-returns on reconnect — so flipping the flag would leave the plugin holding destroyed entities, and HomeKit would silently stop receiving updates after the first reconnect. Pinned by `test/unit/clientOptions.test.js`.
+- **`fakegato-history` is an optional peer dependency, not a dependency.** It hard-depends on `googleapis` (~194 MB) for a Google Drive storage backend this plugin never uses, and that tree carried the package's only production advisory. It is declared under `peerDependencies` with `peerDependenciesMeta.optional: true`, so npm does **not** install it automatically. Live power readings work without it; only the Eve history graph needs it. `lib/DeviceAccessory.js` `try/catch`-wraps the `require` and warns once per Homebridge run when power monitoring is enabled but the module is missing.
+- **The declared floor for `@2colors/esphome-native-api` is `^1.3.6`.** It was `^1.2.3` while the lockfile pinned 1.2.3, so CI tested a client three years older than the one users resolved to. The API surface the plugin touches (`climateCommandService`, `Discovery`, and the `deviceInfo` fields) is unchanged between the two.
+
 ## Working rules (for this repo)
 
 1. **Don't change the wire-format.** `@2colors/esphome-native-api` is a thin protobuf wrapper; we trust it to handle the protocol. Our job is mode mapping and HomeKit service composition.
@@ -401,7 +409,7 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 | `lib/state.js` | Pure ESPHome ↔ HomeKit mode/fan/swing mappers |
 | `lib/eve.js` | Eve.Energy `CurrentPowerConsumption` custom characteristic factory |
 | `lib/constants.js` | Single source of truth: `PLUGIN_NAME`, `PLATFORM_NAME`, `ACCESSORY_SCHEMA_VERSION`, `UUID_NAMESPACE` |
-| `.github/workflows/ci.yml` | Lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x |
+| `.github/workflows/ci.yml` | Lint + tests + smoke on Node 22 / 24 / 26 |
 | `.github/workflows/release.yml` | Tag-driven npm publish (OIDC trusted publishing, no token) + GitHub Release |
 | `package.json` | Package metadata, scripts, deps |
 | `config.schema.json` | Homebridge UI form-based config editor |
@@ -411,10 +419,9 @@ Pre-1.0 tracking: PATCH bumps for fixes, MINOR (`0.X.0`) bumps for behaviour cha
 | `DOCS.md` | Documentation index and update process |
 | `CHANGELOG.md` | Release history (Keep a Changelog) |
 | `ROADMAP.md` | Development plan (M1–M5) |
-| `test/unit/*.test.js` | Jest unit tests (167 currently across 8 suites) |
+| `test/unit/*.test.js` | Jest unit tests (181 currently across 10 suites) |
 | `QA_TESTS.md` | Manual pre-release checklist |
 | `AGENTS.md` | Pointer to this file |
 | `CLAUDE.md` | This file — project memory |
-| `.eslintrc.json` | ESLint legacy config (eslint:recommended; tabs) |
-| `.eslintignore` | ESLint ignore patterns |
+| `eslint.config.mjs` | ESLint 10 flat config (eslint:recommended; tabs; jest globals scoped to `test/`) |
 | `.gitignore` | Standard Node/IDE/local-artifact ignore |

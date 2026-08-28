@@ -14,9 +14,9 @@ The fork was taken at upstream 0.0.4 because the upstream's release cadence (las
 
 ---
 
-## Where we are today (0.5.7 local patch prepared)
+## Where we are today (0.5.7 published; fixes staged unreleased)
 
-✅ **Prepared locally as `homebridge-slwf-01pro@0.5.7`; publish status depends on whether the current agent has tagged and pushed it.** Tag-driven release pipeline via GitHub Actions. CI runs lint + tests + smoke on Node 18.20.4 / 20.15.1 / 22.x / 24.x. **167 unit tests passing** across 8 suites (state, classifyEntity, discovery, configSchema, configSchemaValidation, hapCompliance, pruning, looksLikeRealEntry).
+✅ **Published to npm as `homebridge-slwf-01pro@0.5.7` on 2026-05-24**, with further fixes staged unreleased on `master`. Tag-driven release pipeline via GitHub Actions, publishing through npm trusted publishing (OIDC, no stored token). CI runs lint + tests + smoke on Node 22 / 24 / 26. **181 unit tests passing** across 10 suites (state, classifyEntity, discovery, configSchema, configSchemaValidation, hapCompliance, pruning, looksLikeRealEntry, modeSwitch, clientOptions).
 
 ✅ Dynamic platform, per-device debouncing, mode-mapping refactor with HEAT_COOL handling. **mDNS auto-discovery on by default** (since 0.5.0). **Multi-entity bundling** (Climate + sensors + switches + buttons → one HomeKit accessory) with `HumiditySensor`, outdoor `TemperatureSensor`, hidden-Outlet Eve.Energy power, Beeper switch, Display switch, DRY/FAN_ONLY mode tiles, all hidden by default with bidirectional per-device override. ESPHome connection loss is tracked internally; disconnected writes return clean HomeKit communication errors.
 
@@ -42,7 +42,7 @@ Source: [`homebridge/plugins`](https://github.com/homebridge/plugins) verificati
 | 2 | Doesn't duplicate an existing verified plugin | ✅ | Upstream `homebridge-esphome-ac` is not Verified |
 | 3 | Published to npm with source on GitHub, issues enabled | ✅ | npm package `homebridge-slwf-01pro` (after first publish) |
 | 4 | A GitHub release per new version with notes | ✅ | `release.yml` workflow auto-creates Releases on `v*` tags |
-| 5 | Runs on supported LTS Node versions | ✅ | Current Homebridge-supported LTS lines are Node 22/24; CI also keeps 18.20.4/20.15.1 for Homebridge 1.8 compatibility |
+| 5 | Runs on supported LTS Node versions | ✅ | CI covers Node 22 / 24 / 26. Node 18 and 20 were dropped once both reached EOL and eslint 10 raised its own floor to 20.19 |
 | 6 | Installs successfully and doesn't start unless configured | ✅ | Requires a platform block; with defaults it starts discovery by design, and spawns no clients when no manual/discovered/cached Climate devices exist |
 | 7 | No post-install scripts that modify the user's system | ✅ | No `postinstall`/install lifecycle scripts |
 | 8 | No TTY / non-standard startup parameters | ✅ | None |
@@ -83,7 +83,7 @@ Versioning policy below is pre-1.0; once stable, switch to strict [SemVer](https
 | **Unit tests (78 passing)** | `state.js` + `classifyEntity.js` + `discovery.js` | ✅ Done |
 | Lint clean | Indentation fixes via mode-mapping refactor | ✅ Done |
 | `repository.url` fix | Point to fork URL (sigstore provenance) | ✅ Done |
-| `engines` raised | Node 18.20.4+ / Homebridge ^1.8.0 || ^2.0.0 | ✅ Done |
+| `engines` raised | Node ^22 || ^24 || ^26 / Homebridge ^1.8.0 || ^2.0.0 | ✅ Done |
 | `displayName` | "Homebridge SLWF-01Pro / ESPHome AC" | ✅ Done |
 | Docs (README + DOCS + CLAUDE + CHANGELOG + ROADMAP + QA_TESTS + config.schema) | Lean doc set with explicit ownership and update process | ✅ Done |
 | **UUID derivation** | Fallback chain when ESPHome doesn't set `unique_id` | ✅ Done in 0.1.2 |
@@ -110,7 +110,7 @@ Versioning policy below is pre-1.0; once stable, switch to strict [SemVer](https
 | **HAP audit fixes** | `setProps NaN`-safety, mode-fallthrough uses `validValues[0]`, `ConfiguredName`, `Identify` handler, `RotationSpeed.minStep`, constants single-sourced | ✅ 0.4.3 |
 | **HAP-compliance test suite** | Mock HAP shim asserting all of the above | ✅ 0.4.3 (10 tests) |
 
-**Total tests:** 130 across 6 suites. All shipped on npm with provenance.
+**Total tests at 0.4.3:** 130 across 6 suites. All shipped on npm with provenance. (Current count: 181 across 10 suites — see above.)
 
 ---
 

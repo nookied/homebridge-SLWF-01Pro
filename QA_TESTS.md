@@ -1,6 +1,6 @@
 # QA — Manual pre-release checklist
 
-Run this on the real Homebridge host before tagging a release. Jest covers the pure helpers and HAP shape (167 unit tests as of 0.5.7); this checklist is the line of defence against regressions on real ESPHome hardware that the unit suite can't see.
+Run this on the real Homebridge host before tagging a release. Jest covers the pure helpers and HAP shape (181 unit tests); this checklist is the line of defence against regressions on real ESPHome hardware that the unit suite can't see.
 
 Budget: ~10 minutes per release.
 
@@ -15,7 +15,7 @@ Budget: ~10 minutes per release.
 - [ ] `package.json` `repository.url` matches the GitHub repo URL exactly (sigstore provenance is strict — see CHANGELOG)
 - [ ] `.github/workflows/release.yml` is still named exactly that, and `actions/setup-node` still has **no** `registry-url` — npm matches the trusted publisher on workflow filename, and `registry-url` breaks the OIDC exchange (see CLAUDE.md → Release & npm publishing)
 - [ ] `npm run lint` clean
-- [ ] `npm test` — all unit tests pass (167 as of 0.5.7; bump this number alongside any test additions)
+- [ ] `npm test` — all unit tests pass (181 currently; bump this number alongside any test additions)
 - [ ] `node -e "require('./index.js')"` smoke test exits 0
 - [ ] Working git SHA noted for rollback: `_______________`
 
@@ -115,6 +115,8 @@ These are bugs that broke previous versions. Verify they stay fixed:
 - [ ] **HEAT_COOL devices show AUTO button** *(broken in upstream 0.0.4 — only AUTO=6 was handled)*. If your device's mode dropdown shows `HEAT_COOL` (not `AUTO`), the HomeKit AUTO button must still appear and work.
 - [ ] **No sticky warning badge on disconnect/reconnect** — pull the dongle's power for 30 sec, then reconnect it; HomeKit writes should fail cleanly while disconnected and normal control should resume after reconnect without a persistent ⚠️ badge.
 - [ ] **Construction succeeds for devices without `unique_id` set in YAML** *(broken in 0.1.0/0.1.1; fixed in 0.1.2)*. Reproduce: an ESPHome device whose `climate:` block doesn't set `unique_id` should still get a stable HomeKit accessory; the log should show `Initialized "<name>" with N mapped entit(y|ies)` not `Failed to initialize ...: Received undefined`.
+- [ ] **Dry / Fan Only switch returns an off AC to off** *(broken until the fix after 0.5.7)*. With the AC **off**, enable the Dry (or Fan Only) tile, then turn it off again. The AC must go back to **off** — not start cooling. Repeat with the AC running in Heat: it must return to Heat.
+- [ ] **Fan speed tracks the device in Fan Only** — put the AC in Fan Only, change the fan speed on the AC's own remote, and confirm the HomeKit fan slider follows.
 - [ ] **Upstream-orphan warning fires when applicable** *(0.2.0+)*. If you upgraded from upstream `homebridge-esphome-ac`, the first launch logs `Detected N cached accessor… from upstream "homebridge-esphome-ac"` with cleanup instructions. After cleanup, the warning stops appearing.
 
 ## 6. Edge cases
